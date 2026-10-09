@@ -40,6 +40,7 @@ export async function createChallenge(db: DB, input: { name: string; creator: { 
 }
 
 const MAX_PLAYERS = 2;
+const money = (cents: number) => `S$${(cents / 100).toFixed(2)}`;
 
 // Single atomic statement so two simultaneous joins can never overfill a challenge.
 async function addParticipant(db: DB, challengeId: string, userId: string) {
@@ -124,13 +125,15 @@ async function requireStatus(db: DB, challengeId: string, ...allowed: string[]) 
   return c;
 }
 
-export async function lockRewards(db: DB, challengeId: string, userId: string, lowestId: string, bestId: string) {
+export async function lockRewards(db: DB, challengeId: string, userId: string, lowestId: string, bestId: string, budgetCents: number) {
   await requireStatus(db, challengeId, "draft");
   await requireParticipant(db, challengeId, userId);
   const lowest = findProduct(lowestId);
   const best = findProduct(bestId);
   if (!lowest || !best) throw new HttpError(400, "Unsupported product");
   if (lowest.priceCents >= best.priceCents) throw new HttpError(400, "Best reward must cost more than the lowest reward");
+  if (best.priceCents > budgetCents)
+    throw new HttpError(400, `Your spending cap (${money(budgetCents)}) must cover your best reward (${money(best.priceCents)}). Raise your cap or pick a cheaper reward.`);
   const existing = await db
     .select()
     .from(t.rewardChoices)
@@ -166,6 +169,7 @@ export async function authorize(
     .from(t.paymentAuthorizations)
     .where(and(eq(t.paymentAuthorizations.challengeId, challengeId), eq(t.paymentAuthorizations.userId, userId)));
   if (existing?.status === "active") throw new HttpError(409, "Already authorised");
+  await requireCeilingCoversOwnRewards(db, challengeId, userId, ceilingCents);
   const [user] = await db.select().from(t.users).where(eq(t.users.id, userId));
   // Hosted card enrolment: card details never reach our server. Only the enrolment id and our own ceiling are stored.
   const enrollment = await reap.createEnrollment({
@@ -185,6 +189,32 @@ export async function authorize(
   else await db.insert(t.paymentAuthorizations).values({ challengeId, userId, ...row });
   await maybeActivate(db, challengeId);
   return { approvalUrl: enrollment.approvalUrl };
+}
+
+// A player's cap must at least cover the best reward they chose, so the AI's picks are always affordable.
+async function requireCeilingCoversOwnRewards(db: DB, challengeId: string, userId: string, ceilingCents: number) {
+  const mine = await db
+    .select()
+    .from(t.rewardChoices)
+    .where(and(eq(t.rewardChoices.challengeId, challengeId), eq(t.rewardChoices.userId, userId)));
+  if (mine.length !== 2) throw new HttpError(400, "Lock in your rewards before setting up payment");
+  const best = mine.find((r) => r.tier === "best")!;
+  if (ceilingCents < best.priceCents)
+    throw new HttpError(400, `Your spending cap must be at least ${money(best.priceCents)} to cover your best reward.`);
+}
+
+// Raise (or lower, within limits) the cap before the challenge starts, e.g. to cover the friend's best reward.
+export async function updateCeiling(db: DB, challengeId: string, userId: string, ceilingCents: number) {
+  await requireStatus(db, challengeId, "draft");
+  await requireParticipant(db, challengeId, userId);
+  const [auth] = await db
+    .select()
+    .from(t.paymentAuthorizations)
+    .where(and(eq(t.paymentAuthorizations.challengeId, challengeId), eq(t.paymentAuthorizations.userId, userId)));
+  if (!auth) throw new HttpError(404, "Set up payment first");
+  await requireCeilingCoversOwnRewards(db, challengeId, userId, ceilingCents);
+  await db.update(t.paymentAuthorizations).set({ spendingCeilingCents: ceilingCents }).where(eq(t.paymentAuthorizations.id, auth.id));
+  await maybeActivate(db, challengeId);
 }
 
 // Called after the user returns from the hosted card page.
@@ -210,9 +240,13 @@ async function maybeActivate(db: DB, challengeId: string) {
   if (people.length !== 2) return;
   const rewards = await db.select().from(t.rewardChoices).where(eq(t.rewardChoices.challengeId, challengeId));
   const auths = await db.select().from(t.paymentAuthorizations).where(eq(t.paymentAuthorizations.challengeId, challengeId));
-  const ready = people.every(
-    (p) => rewards.filter((r) => r.userId === p.userId).length === 2 && auths.some((a) => a.userId === p.userId && a.status === "active"),
-  );
+  // Each player may be asked to buy the other's best reward, so their cap must cover it.
+  const bestOf = (uid: string) => rewards.find((r) => r.userId === uid && r.tier === "best")?.priceCents ?? Infinity;
+  const ready = people.every((p) => {
+    const other = people.find((q) => q.userId !== p.userId)!;
+    const auth = auths.find((a) => a.userId === p.userId && a.status === "active");
+    return rewards.filter((r) => r.userId === p.userId).length === 2 && !!auth && auth.spendingCeilingCents >= bestOf(other.userId);
+  });
   if (ready) {
     await db
       .update(t.challenges)
@@ -406,6 +440,10 @@ export async function getState(db: DB, challengeId: string) {
       rewards: rewards.filter((r) => r.userId === p.userId),
       authorised: auths.some((a) => a.userId === p.userId && a.status === "active"),
       enrolmentPending: auths.some((a) => a.userId === p.userId && a.status === "pending"),
+      ceilingCents: auths.find((a) => a.userId === p.userId)?.spendingCeilingCents ?? null,
+      // The most this player may be charged: the other player's best reward.
+      requiredCeilingCents:
+        rewards.find((r) => r.userId !== p.userId && r.tier === "best")?.priceCents ?? null,
     })),
     leaderboard: scores,
     transactions,

@@ -5,7 +5,7 @@ import { recommend } from "./ai.js";
 import { db } from "./db/client.js";
 import { ACTIVITY_IDS, DEFAULT_ACTIVITY } from "../shared/activities.js";
 import { users } from "./db/schema.js";
-import { CATALOGUE } from "./merchants.js";
+import { getCatalogue } from "./merchants.js";
 import * as svc from "./service.js";
 
 const person = z.object({
@@ -55,7 +55,7 @@ app.get("/config", (c) =>
         : "unavailable",
   }),
 );
-app.get("/merchants", (c) => c.json(CATALOGUE));
+app.get("/merchants", (c) => c.json(getCatalogue()));
 
 app.post(
   "/challenges",
@@ -90,6 +90,16 @@ app.get("/lobby", zValidator("query", z.object({ activity: z.enum(ACTIVITY_IDS).
   c.json(await svc.listLobby(db, c.req.valid("query").activity)),
 );
 
+app.post(
+  "/challenges/:id/ceiling",
+  zValidator("json", ids.extend({ spendingCeilingCents: z.number().int().min(100).max(100_000) })),
+  async (c) => {
+    const b = c.req.valid("json");
+    await svc.updateCeiling(db, c.req.param("id"), b.userId, b.spendingCeilingCents);
+    return c.json(await svc.getState(db, c.req.param("id")));
+  },
+);
+
 app.post("/challenges/:id/cancel", zValidator("json", ids), async (c) => {
   await svc.cancelChallenge(db, c.req.param("id"), c.req.valid("json").userId);
   return c.json(await svc.getState(db, c.req.param("id")));
@@ -112,14 +122,27 @@ app.post(
   "/challenges/:id/recommend",
   zValidator(
     "json",
-    z.object({ preferences: z.string().max(500).default("") }),
+    z.object({
+      preferences: z.string().max(500).default(""),
+      budgetCents: z.number().int().min(100).max(100_000),
+    }),
   ),
-  async (c) => c.json(await recommend(c.req.valid("json").preferences)),
+  async (c) => {
+    const b = c.req.valid("json");
+    return c.json(await recommend(b.preferences, b.budgetCents));
+  },
 );
 
 app.post(
   "/challenges/:id/rewards",
-  zValidator("json", ids.extend({ lowestId: z.string(), bestId: z.string() })),
+  zValidator(
+    "json",
+    ids.extend({
+      lowestId: z.string(),
+      bestId: z.string(),
+      budgetCents: z.number().int().min(100).max(100_000),
+    }),
+  ),
   async (c) => {
     const b = c.req.valid("json");
     await svc.lockRewards(
@@ -128,6 +151,7 @@ app.post(
       b.userId,
       b.lowestId,
       b.bestId,
+      b.budgetCents,
     );
     return c.json(await svc.getState(db, c.req.param("id")));
   },

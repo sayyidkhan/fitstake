@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, money, type LobbyEntry, type Recommendation, type State } from "./api";
+import { api, money, type LobbyEntry, type Product, type Recommendation, type State } from "./api";
+import { priceBand } from "../shared/pricing";
 import {
   ACTIVITIES,
   ACTIVITY_CATEGORIES,
@@ -1109,7 +1110,9 @@ function Setup({
 }) {
   const [prefs, setPrefs] = useState("");
   const [rec, setRec] = useState<Recommendation | null>(null);
-  const [ceiling, setCeiling] = useState(100);
+  const [pickLow, setPickLow] = useState<Product | null>(null);
+  const [pickBest, setPickBest] = useState<Product | null>(null);
+  const [cap, setCap] = useState(100); // S$ spending cap, also the AI's budget
   const [approvalUrl, setApprovalUrl] = useState<string | null>(null);
   const [simulated, setSimulated] = useState(false);
   useEffect(() => {
@@ -1118,8 +1121,72 @@ function Setup({
       .then((c) => setSimulated(c.payments === "simulated"))
       .catch(() => {});
   }, []);
+  // Show the saved cap once one exists.
+  useEffect(() => {
+    if (me.ceilingCents) setCap(me.ceilingCents / 100);
+  }, [me.ceilingCents]);
+
   const locked = me.rewards.length === 2;
-  const ceilingOk = Number.isFinite(ceiling) && ceiling >= 1 && ceiling <= 1000;
+  const capCents = Math.round(cap * 100);
+  const capValid = Number.isFinite(cap) && capCents >= 100 && capCents <= 100_000;
+  const myBest = me.rewards.find((r) => r.tier === "best")?.priceCents ?? null;
+  const required = me.requiredCeilingCents ?? null; // the friend's best reward: the most you may be asked to buy
+  const needAtLeast = Math.max(myBest ?? 0, required ?? 0);
+  const staleRec = rec !== null && rec.budgetCents !== capCents;
+  const pickTooPricey = pickBest !== null && pickBest.priceCents > capCents;
+
+  const capField = (id: string) => (
+    <label className="cap-field" htmlFor={id}>
+      Your spending cap
+      <span className="prefix-field">
+        <span aria-hidden="true">S$</span>
+        <input
+          id={id}
+          className={input}
+          type="number"
+          inputMode="decimal"
+          min={1}
+          max={1000}
+          step={1}
+          aria-invalid={!capValid}
+          value={Number.isNaN(cap) ? "" : cap}
+          onChange={(e) => setCap(e.target.valueAsNumber)}
+        />
+      </span>
+    </label>
+  );
+
+  const optionGroup = (
+    title: string,
+    list: Product[],
+    selected: Product | null,
+    onPick: (p: Product) => void,
+  ) =>
+    list.length > 1 && (
+      <div className="option-group" role="radiogroup" aria-label={title}>
+        <p className="meta">{title}</p>
+        <div className="option-list">
+          {list.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              role="radio"
+              aria-checked={selected?.id === p.id}
+              className={"option-chip" + (selected?.id === p.id ? " selected" : "")}
+              onClick={() => onPick(p)}
+            >
+              <ProductImage id={p.id} name={p.name} imageUrl={p.imageUrl} className="chip-img" />
+              <span>
+                <b>{p.name}</b>
+                <small className="num">
+                  {p.merchant} · {money(p.priceCents)} · {priceBand(p.priceCents)}
+                </small>
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
 
   return (
     <section className={card + " section setup"}>
@@ -1138,13 +1205,24 @@ function Setup({
           </p>
         ) : (
           <>
+            <div className="cap-box">
+              {capField("cap-rewards")}
+              <p>
+                This is the most you can be charged, and it sets the AI’s
+                budget. A <b>higher cap</b> lets it suggest more items and
+                premium ones ($$$$); a <b>lower cap</b> keeps suggestions
+                cheap. It must cover your best reward.
+              </p>
+            </div>
             <form
               className="inline-form"
               onSubmit={(e) => {
                 e.preventDefault();
                 apply(
-                  api.recommend(challengeId, prefs).then((r) => {
+                  api.recommend(challengeId, prefs, capCents).then((r) => {
                     setRec(r);
+                    setPickLow(r.lowest);
+                    setPickBest(r.best);
                     return api.state(challengeId);
                   }),
                 );
@@ -1160,18 +1238,28 @@ function Setup({
                 value={prefs}
                 onChange={(e) => setPrefs(e.target.value)}
               />
-              <button className={rec ? btnQuiet : btn} disabled={busy} aria-busy={busy}>
-                {rec ? "Suggest again" : "Suggest rewards"}
+              <button
+                className={rec && !staleRec ? btnQuiet : btn}
+                disabled={busy || !capValid}
+                aria-busy={busy}
+              >
+                Suggest within S${capValid ? cap : "…"}
               </button>
             </form>
             <p className="field-hint prefs-hint">
               Don’t include health or medical details. Your text is sent to
               OpenAI to suggest rewards.
             </p>
-            {rec && (
+            {rec && pickLow && pickBest && (
               <>
+                {staleRec && (
+                  <p className="setup-note stale-note" role="status">
+                    You changed your cap. Suggest again to refresh the options
+                    for S${cap}.
+                  </p>
+                )}
                 <div className="recommendation-grid">
-                  {[rec.lowest, rec.best].map((product) => (
+                  {[pickLow, pickBest].map((product, i) => (
                     <article key={product.id}>
                       <ProductImage
                         id={product.id}
@@ -1180,29 +1268,38 @@ function Setup({
                         className="rec-img"
                       />
                       <span className="meta">
-                        {product.tier === "best" ? "The bigger win" : "The little treat"}
+                        {i === 1 ? "The bigger win" : "The little treat"}
+                        {product.demoOnly && " · demo item"}
                       </span>
                       <h3>{product.name}</h3>
                       <p>{product.merchant}</p>
-                      <strong className="num">{money(product.priceCents)}</strong>
+                      <strong className="num">
+                        {money(product.priceCents)}
+                        <span className="price-band">{priceBand(product.priceCents)}</span>
+                      </strong>
                     </article>
                   ))}
                 </div>
+                {optionGroup("Other little treats in your cap", rec.options.lowest, pickLow, setPickLow)}
+                {optionGroup("Other bigger wins in your cap", rec.options.best, pickBest, setPickBest)}
                 <p className="rec-reason">{rec.reasoning}</p>
                 <p className="catalog-note">
                   {rec.source === "openai"
                     ? "AI-assisted suggestions"
-                    : "Supported catalogue picks"}{" "}
-                  · final quotes may include shipping and tax
+                    : "Catalogue picks within your cap"}{" "}
+                  · final quotes may include shipping and tax, so leave some room
                 </p>
+                {pickTooPricey && (
+                  <p className="error-banner" role="alert">
+                    Your cap (S${cap}) must be at least {money(pickBest.priceCents)} to cover this reward.
+                  </p>
+                )}
                 <button
                   className={btn}
-                  disabled={busy}
+                  disabled={busy || pickTooPricey || staleRec || pickLow.priceCents >= pickBest.priceCents}
                   aria-busy={busy}
                   onClick={() =>
-                    apply(
-                      api.lock(challengeId, userId, rec.lowest.id, rec.best.id),
-                    )
+                    apply(api.lock(challengeId, userId, pickLow.id, pickBest.id, capCents))
                   }
                 >
                   Lock in rewards
@@ -1214,63 +1311,83 @@ function Setup({
       </div>
       <div className="setup-step">
         <h2 className="section-title">3. Pre-authorise payment</h2>
-        {me.authorised ? (
-          <p className="card-state ok">
-            <Icon name="check" /> Sandbox enrolment ready
+        {!locked ? (
+          <p className="setup-copy">
+            Lock in your rewards first. Your spending cap then covers them.
           </p>
         ) : (
           <>
-            <p className="setup-copy">
-              {simulated
-                ? "Local demo: simulate enrolment without entering a card. Your ceiling caps the final quote, including shipping and tax. No payment provider is contacted."
-                : "Enrol on Reap’s hosted sandbox page. Your ceiling caps the final quote, including shipping and tax. Each final-day charge needs your approval; no funds are held."}
-            </p>
-            <p className="field-hint setup-privacy">
-              To set this up, your name and email are shared with Reap. Card
-              details are entered only on Reap’s page. See the{" "}
-              <a className="text-link" href="#privacy" target="_blank" rel="noopener noreferrer">
-                Privacy Policy
-              </a>
-              .
-            </p>
-            <label className="ceiling">
-              Spending ceiling
-              <span className="prefix-field">
-                <span aria-hidden="true">S$</span>
-                <input
-                  className={input}
-                  type="number"
-                  inputMode="decimal"
-                  min={1}
-                  max={1000}
-                  aria-invalid={!ceilingOk}
-                  aria-describedby="ceiling-hint"
-                  value={ceiling}
-                  onChange={(e) => setCeiling(Number(e.target.value))}
-                />
-              </span>
-              <small className="field-hint" id="ceiling-hint">
-                Between S$1 and S$1,000.
-              </small>
-            </label>
+            {!me.authorised && (
+              <>
+                <p className="setup-copy">
+                  {simulated
+                    ? "Local demo: simulate enrolment without entering a card. Your cap limits the final quote, including shipping and tax. No payment provider is contacted."
+                    : "Enrol on Reap’s hosted sandbox page. Your cap limits the final quote, including shipping and tax. Each final-day charge needs your approval; no funds are held."}
+                </p>
+                <p className="field-hint setup-privacy">
+                  To set this up, your name and email are shared with Reap. Card
+                  details are entered only on Reap’s page. See the{" "}
+                  <a className="text-link" href="#privacy" target="_blank" rel="noopener noreferrer">
+                    Privacy Policy
+                  </a>
+                  .
+                </p>
+              </>
+            )}
+            <div className="cap-box">
+              {capField("cap-payment")}
+              <p>
+                At least <b>{money(myBest ?? 0)}</b> to cover your best reward
+                {required ? (
+                  <>
+                    , and <b>{money(required)}</b> to cover your friend’s best
+                    reward, which you may be asked to buy
+                  </>
+                ) : (
+                  " (and your friend’s best reward once they choose it)"
+                )}
+                .
+              </p>
+            </div>
+            {required !== null && capCents < required && (
+              <p className="setup-note stale-note" role="status">
+                Your friend’s best reward costs {money(required)}. Raise your cap to at least{" "}
+                {money(required)} so the challenge can start.
+              </p>
+            )}
             <div className="button-row">
-              <button
-                className={btn}
-                disabled={busy || !ceilingOk}
-                aria-busy={busy}
-                onClick={async () => {
-                  apply(
-                    api
-                      .authorize(challengeId, userId, Math.round(ceiling * 100))
-                      .then((r) => {
-                        setApprovalUrl(r.approvalUrl);
-                        return r.state;
-                      }),
-                  );
-                }}
-              >
-                {simulated ? "Simulate enrolment" : "Prepare secure enrolment"}
-              </button>
+              {!me.authorised && (
+                <button
+                  className={btn}
+                  disabled={busy || !capValid || capCents < (myBest ?? 0)}
+                  aria-busy={busy}
+                  onClick={() => {
+                    apply(
+                      api
+                        .authorize(challengeId, userId, capCents)
+                        .then((r) => {
+                          setApprovalUrl(r.approvalUrl);
+                          return r.state;
+                        }),
+                    );
+                  }}
+                >
+                  {simulated ? "Simulate enrolment" : "Prepare secure enrolment"}
+                </button>
+              )}
+              {(me.authorised || me.enrolmentPending) &&
+                capValid &&
+                capCents !== me.ceilingCents &&
+                capCents >= needAtLeast && (
+                  <button
+                    className={btn}
+                    disabled={busy}
+                    aria-busy={busy}
+                    onClick={() => apply(api.updateCeiling(challengeId, userId, capCents))}
+                  >
+                    Update my cap to S${cap}
+                  </button>
+                )}
               {approvalUrl && (
                 <a
                   className={btn}
@@ -1295,6 +1412,11 @@ function Setup({
                 </button>
               )}
             </div>
+            {me.authorised && (
+              <p className="card-state ok">
+                <Icon name="check" /> Sandbox enrolment ready
+              </p>
+            )}
           </>
         )}
       </div>
