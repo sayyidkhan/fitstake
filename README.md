@@ -1,44 +1,152 @@
-# FitStake (hackathon POC)
+# FitStake
 
-Vite + React + Tailwind frontend, Hono API at `/api/*` (Vercel serverless), Turso + Drizzle, OpenAI recommendations, Reap Agentic Payments (sandbox).
+A 1-vs-1 fitness challenge proof-of-concept. Two friends commit to a healthy activity for a set number of days. The loser buys the winner's best reward; the winner buys the loser's lowest reward. Everyone gets something, and better progress unlocks the better prize.
 
-## Deploy
-Production branch: `claude/loving-euler-z1g9y3` (set under Vercel → Settings → Git).
+Built with **Vite + React + Tailwind CSS** on the frontend, **Hono + Drizzle + Turso** on the backend, and **Reap Agentic Payments** (sandbox) for checkout.
 
-Import the repo in Vercel and set the env vars from `.env.example` for Production, Preview and Development. The build runs `db:migrate` against Turso automatically, then `vite build`. The API is served from `api/index.ts`; `vercel.json` routes every `/api/*` path to this function, including nested challenge routes. Named `GET` and `POST` exports use Vercel's Web Request/Response handlers.
+- **Live site:** https://fitstake-eta.vercel.app
+- **Production branch:** `claude/loving-euler-z1g9y3`
+- **Full project context:** see [`docs/HANDOFF.md`](docs/HANDOFF.md)
+- **Agent quick-start:** see [`AGENTS.md`](AGENTS.md)
 
-Before deploying, open **Vercel → Project Settings → Environment Variables** and add:
+---
 
-- `TURSO_DATABASE_URL`: your Turso database URL (`libsql://…`; the project's example is in `.env.example`).
-- `TURSO_AUTH_TOKEN`: a valid token for that database.
+## What it does
 
-Select **Production** for deployments from the configured production branch and **Preview** for other branches. Save the variables, then redeploy; existing deployments do not receive newly saved values. A local `.env` file and `.env.example` do not configure Vercel's environment variables. Keep these variables server-side, without a `VITE_` prefix.
+1. **Create or join a challenge** — set an activity and duration (1–365 days), then invite a friend or join from the public lobby.
+2. **Lock in rewards** — the AI suggests a lowest and best reward within your spending cap.
+3. **Enrol a card** — through Reap's hosted sandbox page, with a clear spending ceiling.
+4. **Compete** — daily active minutes (capped at 90) plus a bonus for 30+ minute days. Scoring is fully deterministic.
+5. **Settle** — the loser buys the winner's best reward; the winner buys the loser's lowest. Each purchase is approved separately.
 
-If the build reports `ENOTFOUND turso_database_url-not-set.invalid`, the deployment is missing `TURSO_DATABASE_URL`. The migration script now checks both required variables before connecting and reports the missing names directly. Keep migrations enabled so a successful deployment has its database tables ready.
+This is a **sandbox-only hackathon POC**: fitness data is simulated and no real money moves.
 
-Optional local run: `cp .env.example .env`, fill it in, then `npm run dev` (web :5173, api :8787) and `npm test`.
+---
 
-## Notes
-- `server/reap.ts`: set `REAP_API_KEY` (version defaults to 2025-02-14) for the live Reap sandbox adapter; without them a local simulator runs. Reap mandates are not live yet, so Day 1 = hosted card enrolment and Day 30 = each payer approves their checkout via Reap's hosted page. The live adapter is untested against real Reap responses (amount units and variant resolution are assumptions; pin `variantId` in `server/merchants.ts` for the exact shorts size).
-- Quotes use a fixed demo shipping address (`server/demoAddress.ts`).
-- Only mandate terms are stored. No card data or API keys in the browser or DB.
-- Settlement is idempotent (unique key per reward purchase, claimed before checkout).
-- Outcome-dependent purchases may count as restricted gambling: get organiser clearance. No real-money staking.
+## Quick start
 
-## Legal pages (Singapore)
+Requires **Node.js ≥ 22.9** (Node 24 recommended).
 
-The site serves three pages at `#privacy`, `#terms` and `#data-policy`, with source in `src/legal.tsx`. They are a PDPA-oriented draft and must be reviewed by Singapore counsel before launch.
+```bash
+npm install
 
-- Fill in every highlighted placeholder in `src/legal.tsx` (`LEGAL` block and any bracketed text): UEN, registered address, DPO/privacy email, liability cap, retention periods and the Reap notice reference.
-- Users accept the current `TERMS_VERSION` (`server/legal.ts`) **once, when they create their account** (sign-up requires `acceptedTerms: true`). The accepted version and time are stored on the user. Bump `TERMS_VERSION` and `LEGAL.lastUpdated` whenever the pages change materially.
-- Real-money purchases and real activity data must not be enabled until the gambling, lottery and payment-services questions in the Terms (section 1) are confirmed with counsel.
+# Copy the example env file and fill it in
+cp .env.example .env
 
-## Local UI preview and assessment
+# For isolated local development, use a file-based DB:
+# TURSO_DATABASE_URL=file:local.db
 
-See `docs/PRODUCT_ASSESSMENT.md` for product direction, verified flows, and pilot prerequisites. UI captures are in `docs/ui-preview.jpg` and `docs/challenge-preview.jpg`.
+npm run db:migrate
+npm run dev
+```
 
-Use Node 22.9+ (Node 24 recommended). Run `npm install`, create `.env`, then `npm run db:migrate` and `npm run dev`. The API and migration commands load `.env` automatically. For isolated local development use `TURSO_DATABASE_URL=file:local.db`. Leave `REAP_API_KEY` empty to exercise the complete local simulator. Set a sandbox key and `REAP_BASE_URL=https://sg.sandbox.api.reap.global` for the Singapore Reap adapter. A connected badge indicates configuration, not a completed checkout.
+- Web frontend: http://localhost:5173
+- API: http://localhost:8787
 
-Run `node --env-file=.env scripts/check-reap.mjs` for a read-only authenticated catalogue check. It prints status/product count without exposing credentials. Reap hosted flows require an HTTPS return URL; the localhost preview is intended for UI and simulated-flow verification.
+Run tests and type checks:
 
-Never commit `.env` or card details. Set rotated server credentials in the deployment environment. The app is a hackathon POC: accounts use email-code login (demo mode `AUTH_DEV_CODE=true` skips verification and must not be used with real users), and live payment completion is not yet verified. See `docs/HANDOFF.md` for the full project handoff.
+```bash
+npm test
+npm run typecheck
+```
+
+A full build (also runs `tsc`):
+
+```bash
+npm run build
+```
+
+---
+
+## Tech stack
+
+| Layer | Technology |
+|-------|------------|
+| Frontend | React 19, Vite, Tailwind CSS 4, `@fontsource-variable/inter` |
+| API | Hono (TypeScript), Vercel serverless function via `api/index.ts` |
+| Database | Turso (libSQL) with Drizzle ORM |
+| AI | OpenAI API for reward suggestions (optional; has fallback) |
+| Payments | Reap Agentic Payments sandbox, plus a local simulator when no key is set |
+| Auth | Email-code login with HttpOnly sessions; optional demo mode |
+| Email | Gmail SMTP (nodemailer) or Resend |
+
+---
+
+## Deploy to Vercel
+
+1. Import the repo in Vercel.
+2. Set the production branch to `claude/loving-euler-z1g9y3`.
+3. Add the required environment variables under **Project Settings → Environment Variables** (set for Production, Preview, and Development, then redeploy):
+
+| Variable | Required? | Notes |
+|----------|-----------|-------|
+| `TURSO_DATABASE_URL` | Yes | `libsql://…` or `file:local.db` |
+| `TURSO_AUTH_TOKEN` | Yes | Token for the Turso database |
+| `AUTH_SECRET` | For real auth | 32+ random chars |
+| `GMAIL_USER` + `GMAIL_APP_PASSWORD` | One email provider needed for real login | Or use `RESEND_API_KEY` + `EMAIL_FROM` |
+| `OPENAI_API_KEY` | Optional | Enables AI reward explanations |
+| `REAP_API_KEY` | For live payments | Without it, the local simulator runs |
+| `AUTH_DEV_CODE` | Demo only | `true` = instant insecure sign-in. Currently on in production for demos; remove before real users. |
+
+Build command (already configured in `vercel.json`):
+
+```bash
+npm run db:migrate && vite build
+```
+
+Migrations run on every deploy and are idempotent. The API is served from `api/index.ts` with `GET`/`POST` exports.
+
+**Important:** keep env vars server-side only. Never use a `VITE_` prefix for secrets, and never commit `.env` files.
+
+---
+
+## Repo map
+
+```
+api/index.ts            Vercel entry point (named GET/POST exports)
+server/app.ts           Routes, validation, same-origin checks
+server/service.ts       Business logic for challenges, rewards, settlement, lobby
+server/auth.ts          Email-code login and demo mode
+server/session.ts       Cookie helpers, requireUser, same-origin middleware
+server/reap.ts          Live Reap adapter + local simulator
+server/ai.ts            OpenAI reward recommender + fallback
+server/merchants.ts     Supported catalogue items
+server/scoring.ts       Deterministic scoring and tie-breaks
+server/db/              Drizzle schema, client, migrations
+shared/                 activities.ts, pricing.ts
+src/App.tsx             React SPA with hash routing
+src/api.ts              Typed API client
+src/legal.tsx           Privacy, Terms, and Data Policy pages
+src/index.css           Tailwind + design tokens
+drizzle/                SQL migrations
+scripts/check-reap.mjs  Read-only Reap connectivity check
+tests/                  Vitest tests
+```
+
+---
+
+## Product rules
+
+- **Scoring:** 1 point per active minute, capped at 90/day, plus 10 bonus points for any day with ≥ 30 minutes.
+- **Tie-breaks:** more active days → more steps → stable hash of the challenge id.
+- **Rewards:** each player locks one lowest-value and one best-value reward. The AI only suggests items within the player's spending cap.
+- **Start:** the challenge activates once both players have locked rewards, enrolled a card, and set a cap high enough to cover the friend's best reward.
+- **Settlement:** the loser buys the winner's best reward; the winner buys the loser's lowest reward. Each purchase is a separate, idempotent, retryable transaction.
+
+---
+
+## Important notes
+
+- **Demo mode is on.** `AUTH_DEV_CODE=true` in production lets anyone sign in as any email with no code. Turn this off and configure real email before accepting real users.
+- **Legal pages are a draft.** `src/legal.tsx` is a Singapore PDPA-oriented draft with placeholders. It must be reviewed by counsel and filled in before launch.
+- **Reap flow is partly unproven.** API key, version header, and hosted enrolment session creation work, but the full quote → checkout → approval → `COMPLETED` flow has not been run end to end.
+- **Outcome-dependent purchases** may fall under restricted categories (gambling/lottery/payment-services). Get organiser/provider clearance before enabling real money.
+- **No real-money staking.** This build stays in sandbox.
+
+---
+
+## More docs
+
+- [`AGENTS.md`](AGENTS.md) — conventions, commands, and gotchas for anyone working on the code.
+- [`docs/HANDOFF.md`](docs/HANDOFF.md) — full project history, architecture, payments status, risks, and demo script.
+- [`docs/PRODUCT_ASSESSMENT.md`](docs/PRODUCT_ASSESSMENT.md) — product recommendation, validation notes, and remaining work.
