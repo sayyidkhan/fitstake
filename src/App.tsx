@@ -243,6 +243,7 @@ function AppInner() {
   const session: Session | null = account && challengeId ? { challengeId, userId: account.id } : null;
   const [state, setState] = useState<State | null>(null);
   const [error, setError] = useState("");
+  const [joinedName, setJoinedName] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [page, setPage] = useState<Page>(pageFromHash);
   useEffect(() => {
@@ -285,6 +286,7 @@ function AppInner() {
     }
     setChallengeId(null);
     setState(null);
+    setJoinedName(null);
   }, []);
   // Logged out (or logged in as someone else): forget the open challenge.
   useEffect(() => {
@@ -344,7 +346,8 @@ function AppInner() {
       <Shell page={page}>
         <Lobby
           me={account}
-          onJoined={(r) => {
+          onJoined={(r, name) => {
+            setJoinedName(name);
             start(r);
             window.location.hash = "";
           }}
@@ -446,6 +449,17 @@ function AppInner() {
 
   return (
     <Shell page={page}>
+      {joinedName && (
+        <p role="status" className="success-banner mb-4">
+          <span>
+            ✓ You’ve joined <b>{joinedName}</b>.{" "}
+            {challenge.status === "draft" ? "Next: pick your rewards below, then the challenge starts once everyone has." : "Good luck!"}
+          </span>
+          <button className="text-link" onClick={() => setJoinedName(null)} aria-label="Dismiss">
+            Dismiss
+          </button>
+        </p>
+      )}
       <header className="mb-6 flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="eyebrow">YOUR CHALLENGE HQ</p>
@@ -1111,7 +1125,7 @@ function Start({
   );
 }
 
-function Lobby({ me, onJoined }: { me: AuthUser | null | undefined; onJoined: (s: { challengeId: string }) => void }) {
+function Lobby({ me, onJoined }: { me: AuthUser | null | undefined; onJoined: (s: { challengeId: string }, challengeName: string) => void }) {
   const [list, setList] = useState<LobbyEntry[] | null>(null);
   const [activity, setActivity] = useState("");
   const [error, setError] = useState("");
@@ -1145,7 +1159,7 @@ function Lobby({ me, onJoined }: { me: AuthUser | null | undefined; onJoined: (s
     }
     setJoining(c.id);
     try {
-      onJoined(await api.joinLobby(c.id));
+      onJoined(await api.joinLobby(c.id), c.name);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not join");
       refresh();
