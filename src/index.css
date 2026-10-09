@@ -1407,7 +1407,7 @@ footer {
 }
 .lobby-who {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 360px);
   gap: 16px;
   margin-top: 24px;
 }
@@ -1782,5 +1782,169 @@ footer {
 @media (max-width: 680px) {
   .cap-box {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Accounts */
+.topbar-right {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.login-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: none;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  transition:
+    background 0.16s var(--ease),
+    color 0.16s var(--ease);
+}
+.login-link:hover {
+  background: var(--ink);
+  color: var(--bg);
+}
+.account-menu {
+  position: relative;
+}
+.account-menu summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 0 12px 0 5px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+}
+.account-menu summary:hover {
+  background: var(--surface-3);
+}
+.account-menu summary::-webkit-details-marker {
+  display: none;
+}
+.avatar-sm {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--accent);
+  font-size: 13px;
+  font-weight: 750;
+}
+.account-pop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 20;
+  min-width: 240px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 6px;
+  box-shadow: 0 12px 30px -12px #1f332a4d;
+  display: grid;
+}
+.account-pop p {
+  padding: 8px 10px;
+  margin: 0 0 4px;
+  font-size: 14px;
+  border-bottom: 1px solid var(--line);
+}
+.account-pop small {
+  display: block;
+  color: var(--ink-3);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.account-pop a,
+.account-pop button {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  text-align: left;
+  font-size: 14px;
+  padding: 0 10px;
+  border-radius: 8px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.account-pop a:hover,
+.account-pop button:hover {
+  background: var(--surface-3);
+}
+.auth-page {
+  max-width: 460px;
+  margin: 0 auto;
+}
+.auth-card h2 {
+  font-size: 28px;
+  font-weight: 680;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  margin: 8px 0 8px;
+}
+.auth-code-form {
+  margin-top: 20px;
+}
+.auth-code-form .code-input {
+  font-size: 24px;
+  letter-spacing: 0.35em;
+  text-align: center;
+}
+.auth-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+.code-fill {
+  color: var(--warn);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.my-challenges {
+  margin-top: var(--space-section);
+}
+.my-challenges h2 {
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  margin: 0 0 12px;
+}
+.my-challenges h3 {
+  font-size: 17px;
+  font-weight: 650;
+  margin: 0;
+}
+.status-draft {
+  color: var(--ink-2);
+}
+.lobby-as {
+  grid-column: 1 / -1;
+  font-size: 15px;
+  color: var(--ink-2);
+  margin: 0;
+}
+@media (max-width: 680px) {
+  .account-name {
+    display: none;
+  }
+  .account-menu summary {
+    padding: 0 5px;
+  }
+  .topbar-right .sandbox-pill {
+    display: none;
   }
 }

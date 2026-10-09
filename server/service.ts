@@ -8,7 +8,7 @@ import { getReap, type CheckoutResult, type ReapClient } from "./reap.js";
 import { decide, rank, scoreUser } from "./scoring.js";
 
 export class HttpError extends Error {
-  constructor(public status: 400 | 403 | 404 | 409, message: string) {
+  constructor(public status: 400 | 401 | 403 | 404 | 409 | 429 | 502 | 503, message: string) {
     super(message);
   }
 }
@@ -20,10 +20,8 @@ async function upsertUser(db: DB, name: string, email: string) {
   const e = email.trim().toLowerCase();
   const acceptance = { termsVersion: TERMS_VERSION, termsAcceptedAt: new Date() };
   const [existing] = await db.select().from(t.users).where(eq(t.users.email, e));
-  if (existing) {
-    await db.update(t.users).set(acceptance).where(eq(t.users.id, existing.id));
-    return { ...existing, ...acceptance };
-  }
+  // Terms are accepted once, at sign-up. Later actions never re-stamp an existing account.
+  if (existing) return existing;
   const [created] = await db
     .insert(t.users)
     .values({ name: name.trim(), email: e, ...acceptance })
@@ -414,6 +412,35 @@ export async function cancelChallenge(db: DB, challengeId: string, userId: strin
     .update(t.challenges)
     .set({ status: "cancelled" })
     .where(and(eq(t.challenges.id, challengeId), eq(t.challenges.status, "draft")));
+}
+
+// Members only: anyone else gets the same "not found" so challenge ids can't be probed.
+export async function assertMember(db: DB, challengeId: string, userId: string) {
+  const [p] = await db
+    .select({ id: t.participants.id })
+    .from(t.participants)
+    .where(and(eq(t.participants.challengeId, challengeId), eq(t.participants.userId, userId)));
+  if (!p) throw new HttpError(404, "Challenge not found");
+}
+
+// The user's own challenges, newest first, including ones still waiting for a friend.
+export async function listMine(db: DB, userId: string) {
+  const rows = await db
+    .select({
+      id: t.challenges.id,
+      name: t.challenges.name,
+      status: t.challenges.status,
+      activity: t.challenges.activity,
+      durationDays: t.challenges.durationDays,
+      inviteCode: t.challenges.inviteCode,
+      players: sql<number>`(SELECT COUNT(*) FROM participants q WHERE q.challenge_id = challenges.id)`,
+    })
+    .from(t.participants)
+    .innerJoin(t.challenges, eq(t.challenges.id, t.participants.challengeId))
+    .where(eq(t.participants.userId, userId))
+    .orderBy(desc(t.challenges.createdAt))
+    .limit(50);
+  return rows.map((r) => ({ ...r, players: Number(r.players) }));
 }
 
 export async function getState(db: DB, challengeId: string) {
