@@ -15,7 +15,7 @@ async function call<T>(path: string, body?: unknown): Promise<T> {
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json.error ?? "Request failed");
+  if (!res.ok) throw new Error(json.detail ? `${json.error}: ${json.detail}` : (json.error ?? "Request failed"));
   return json as T;
 }
 

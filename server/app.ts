@@ -3,6 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { recommend } from "./ai";
 import { db } from "./db/client";
+import { users } from "./db/schema";
 import { CATALOGUE } from "./merchants";
 import * as svc from "./service";
 
@@ -14,10 +15,19 @@ export const app = new Hono().basePath("/api");
 app.onError((err, c) => {
   if (err instanceof svc.HttpError) return c.json({ error: err.message }, err.status);
   console.error(err);
-  return c.json({ error: "Internal error" }, 500);
+  const detail = err instanceof Error ? err.message.slice(0, 200) : "";
+  return c.json({ error: "Internal error", detail }, 500);
 });
 
-app.get("/health", (c) => c.json({ ok: true }));
+app.get("/health", async (c) => {
+  try {
+    const rows = await db.select({ id: users.id }).from(users).limit(1);
+    return c.json({ ok: true, db: "ok", users: rows.length });
+  } catch (err) {
+    console.error("health check failed", err);
+    return c.json({ ok: false, db: err instanceof Error ? err.message.slice(0, 300) : "error" }, 503);
+  }
+});
 app.get("/merchants", (c) => c.json(CATALOGUE));
 
 app.post("/challenges", zValidator("json", z.object({ name: z.string().min(1).max(80), creator: person })), async (c) =>
