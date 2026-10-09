@@ -2,6 +2,7 @@ export type Reward = {
   id: string;
   userId: string;
   tier: "lowest" | "best";
+  productId?: string;
   merchant: string;
   productName: string;
   priceCents: number;
@@ -13,12 +14,14 @@ export type State = {
     inviteCode: string;
     durationDays: number;
     activity: string;
-    status: "draft" | "active" | "settled";
+    isPublic: boolean;
+    status: "draft" | "active" | "settled" | "cancelled";
     winnerUserId: string | null;
     loserUserId: string | null;
   };
+  hostUserId?: string;
   participants: {
-    user: { id: string; name: string; email: string };
+    user: { id: string; name: string };
     rewards: Reward[];
     authorised: boolean;
     enrolmentPending: boolean;
@@ -46,6 +49,7 @@ export type Product = {
   category: string;
   tier: "lowest" | "best";
   priceCents: number;
+  imageUrl?: string;
 };
 export type Recommendation = {
   lowest: Product;
@@ -71,7 +75,23 @@ async function call<T>(path: string, body?: unknown): Promise<T> {
   return json as T;
 }
 
+export type LobbyEntry = {
+  id: string;
+  name: string;
+  activity: string;
+  durationDays: number;
+  host: string;
+  players: number;
+  maxPlayers: number;
+};
+
 export const api = {
+  cancel: (id: string, userId: string) =>
+    call<State>(`/challenges/${id}/cancel`, { userId }),
+  lobby: (activity?: string) =>
+    call<LobbyEntry[]>(`/lobby${activity ? `?activity=${encodeURIComponent(activity)}` : ""}`),
+  joinLobby: (id: string, p: { name: string; email: string }) =>
+    call<{ challengeId: string; userId: string }>(`/lobby/${id}/join`, { ...p, acceptedTerms: true }),
   config: () =>
     call<{ payments: "simulated" | "reap_sandbox" | "unavailable" }>("/config"),
   create: (
@@ -79,15 +99,17 @@ export const api = {
     creator: { name: string; email: string },
     durationDays: number,
     activity: string,
+    isPublic: boolean,
   ) =>
     call<{ challengeId: string; userId: string; inviteCode: string }>(
       "/challenges",
-      { name, creator, durationDays, activity },
+      { name, creator, durationDays, activity, isPublic, acceptedTerms: true },
     ),
   join: (inviteCode: string, p: { name: string; email: string }) =>
     call<{ challengeId: string; userId: string }>("/join", {
       inviteCode,
       ...p,
+      acceptedTerms: true,
     }),
   state: (id: string) => call<State>(`/challenges/${id}`),
   merchants: () => call<Product[]>("/merchants"),

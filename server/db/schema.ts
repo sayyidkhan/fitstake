@@ -9,6 +9,9 @@ export const users = sqliteTable("users", {
   id: id(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
+  // Record of the Terms and Privacy Notice version accepted, for PDPA accountability.
+  termsVersion: text("terms_version"),
+  termsAcceptedAt: integer("terms_accepted_at", { mode: "timestamp" }),
   createdAt: createdAt(),
 });
 
@@ -19,8 +22,10 @@ export const challenges = sqliteTable("challenges", {
   durationDays: integer("duration_days").notNull().default(30),
   // Activity id from shared/activities.ts
   activity: text("activity").notNull().default("any"),
+  // Public challenges appear in the lobby while they have an open seat.
+  isPublic: integer("is_public", { mode: "boolean" }).notNull().default(true),
   // draft -> active (both rewards locked + authorised) -> settled
-  status: text("status", { enum: ["draft", "active", "settled"] }).notNull().default("draft"),
+  status: text("status", { enum: ["draft", "active", "settled", "cancelled"] }).notNull().default("draft"),
   startedAt: integer("started_at", { mode: "timestamp" }),
   settledAt: integer("settled_at", { mode: "timestamp" }),
   winnerUserId: text("winner_user_id"),

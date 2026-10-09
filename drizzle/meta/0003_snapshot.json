@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "e1f90697-1ec0-4e98-beee-0d49b6f06d46",
-  "prevId": "4ee5132d-8fee-4083-b7a4-3f8fe787cc76",
+  "id": "f6608302-5dbc-4308-8263-cddcda2bd4b5",
+  "prevId": "450f7d7a-991c-42de-afbb-8bc6df379467",
   "tables": {
     "activity_logs": {
       "name": "activity_logs",
@@ -132,6 +132,14 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'any'"
+        },
+        "is_public": {
+          "name": "is_public",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
         },
         "status": {
           "name": "status",
@@ -693,6 +701,20 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "terms_version": {
+          "name": "terms_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "terms_accepted_at": {
+          "name": "terms_accepted_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "created_at": {

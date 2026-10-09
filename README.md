@@ -25,6 +25,14 @@ Optional local run: `cp .env.example .env`, fill it in, then `npm run dev` (web 
 - Settlement is idempotent (unique key per reward purchase, claimed before checkout).
 - Outcome-dependent purchases may count as restricted gambling: get organiser clearance. No real-money staking.
 
+## Legal pages (Singapore)
+
+The site serves three pages at `#privacy`, `#terms` and `#data-policy`, with source in `src/legal.tsx`. They are a PDPA-oriented draft and must be reviewed by Singapore counsel before launch.
+
+- Fill in every highlighted placeholder in `src/legal.tsx` (`LEGAL` block and any bracketed text): UEN, registered address, DPO/privacy email, liability cap, retention periods and the Reap notice reference.
+- Users accept the current `TERMS_VERSION` (`server/legal.ts`) when they create or join a challenge. The server rejects requests without `acceptedTerms: true`, and the acceptance version and time are stored on the user. Bump `TERMS_VERSION` and `LEGAL.lastUpdated` whenever the pages change materially.
+- Real-money purchases and real activity data must not be enabled until the gambling, lottery and payment-services questions in the Terms (section 1) are confirmed with counsel.
+
 ## Local UI preview and assessment
 
 See `docs/PRODUCT_ASSESSMENT.md` for product direction, verified flows, and pilot prerequisites. UI captures are in `docs/ui-preview.jpg` and `docs/challenge-preview.jpg`.

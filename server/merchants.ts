@@ -9,6 +9,8 @@ export type Product = {
   currency: "SGD";
   // Pin a Reap variant id (e.g. the exact size/colour) once known; otherwise resolved via product search.
   variantId?: string;
+  // Optional product photo URL. Leave unset to show the built-in illustration.
+  imageUrl?: string;
 };
 
 export const CATALOGUE: Product[] = [

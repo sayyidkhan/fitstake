@@ -112,3 +112,74 @@ describe("activity type", () => {
     expect(ACTIVITIES.some((a) => a.id === DEFAULT_ACTIVITY)).toBe(true);
   });
 });
+
+describe("lobby (server browser)", () => {
+  const email = (p: string) => `${p}${crypto.randomUUID()}@x.io`;
+
+  it("lists open public challenges and hides private, full and started ones", async () => {
+    const open = await svc.createChallenge(db, { name: "open-" + crypto.randomUUID(), activity: "swimming", creator: { name: "Host One", email: email("h") } });
+    const priv = await svc.createChallenge(db, { name: "priv-" + crypto.randomUUID(), isPublic: false, creator: { name: "H", email: email("h") } });
+    const full = await svc.createChallenge(db, { name: "full-" + crypto.randomUUID(), creator: { name: "H", email: email("h") } });
+    await svc.joinChallenge(db, full.inviteCode, { name: "J", email: email("j") });
+
+    const ids = (await svc.listLobby(db)).map((c) => c.id);
+    expect(ids).toContain(open.challengeId);
+    expect(ids).not.toContain(priv.challengeId);
+    expect(ids).not.toContain(full.challengeId);
+
+    const entry = (await svc.listLobby(db)).find((c) => c.id === open.challengeId)!;
+    expect(entry).toMatchObject({ activity: "swimming", host: "Host", players: 1, maxPlayers: 2 });
+    expect(JSON.stringify(entry)).not.toMatch(/@|inviteCode/);
+    expect((await svc.listLobby(db, "running")).map((c) => c.id)).not.toContain(open.challengeId);
+  });
+
+  it("joining from the lobby fills the seat and removes it from the list", async () => {
+    const c = await svc.createChallenge(db, { name: "pick-" + crypto.randomUUID(), creator: { name: "Host", email: email("h") } });
+    await svc.joinPublicChallenge(db, c.challengeId, { name: "Guest", email: email("g") });
+    expect((await svc.listLobby(db)).map((x) => x.id)).not.toContain(c.challengeId);
+    await expect(svc.joinPublicChallenge(db, c.challengeId, { name: "Late", email: email("l") })).rejects.toThrow(/full/);
+  });
+
+  it("cannot join a private challenge by id, only by invite code", async () => {
+    const c = await svc.createChallenge(db, { name: "p", isPublic: false, creator: { name: "Host", email: email("h") } });
+    await expect(svc.joinPublicChallenge(db, c.challengeId, { name: "G", email: email("g") })).rejects.toThrow(/not found/i);
+    await expect(svc.joinChallenge(db, c.inviteCode, { name: "G", email: email("g") })).resolves.toBeTruthy();
+  });
+
+  it("never overfills when several people join at once", async () => {
+    const c = await svc.createChallenge(db, { name: "race-" + crypto.randomUUID(), creator: { name: "Host", email: email("h") } });
+    const results = await Promise.allSettled(
+      Array.from({ length: 5 }, (_, i) => svc.joinPublicChallenge(db, c.challengeId, { name: `G${i}`, email: email("g") })),
+    );
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    expect((await svc.getState(db, c.challengeId)).participants).toHaveLength(2);
+  });
+});
+
+describe("cancelling a challenge", () => {
+  const email = (p: string) => `${p}${crypto.randomUUID()}@x.io`;
+
+  it("host cancels a waiting challenge; it leaves the lobby and can't be joined", async () => {
+    const c = await svc.createChallenge(db, { name: "cx-" + crypto.randomUUID(), creator: { name: "Host", email: email("h") } });
+    expect((await svc.listLobby(db)).map((x) => x.id)).toContain(c.challengeId);
+    await svc.cancelChallenge(db, c.challengeId, c.userId);
+    await svc.cancelChallenge(db, c.challengeId, c.userId); // idempotent
+    expect((await svc.getState(db, c.challengeId)).challenge.status).toBe("cancelled");
+    expect((await svc.listLobby(db)).map((x) => x.id)).not.toContain(c.challengeId);
+    await expect(svc.joinPublicChallenge(db, c.challengeId, { name: "G", email: email("g") })).rejects.toThrow(/cancelled/);
+    await expect(svc.joinChallenge(db, c.inviteCode, { name: "G", email: email("g") })).rejects.toThrow(/cancelled/);
+    await expect(svc.lockRewards(db, c.challengeId, c.userId, "sixeleven-cococoast-500ml", "kydra-axis-linerless-shorts-navy-m")).rejects.toThrow();
+  });
+
+  it("only the host can cancel, and not after the challenge has started", async () => {
+    const c = await svc.createChallenge(db, { name: "cx2", creator: { name: "Host", email: email("h") } });
+    const g = await svc.joinChallenge(db, c.inviteCode, { name: "Guest", email: email("g") });
+    await expect(svc.cancelChallenge(db, c.challengeId, g.userId)).rejects.toThrow(/host/);
+    expect((await svc.getState(db, c.challengeId)).hostUserId).toBe(c.userId);
+    for (const u of [c.userId, g.userId]) {
+      await svc.lockRewards(db, c.challengeId, u, "sixeleven-cococoast-500ml", "kydra-axis-linerless-shorts-navy-m");
+      await svc.authorize(db, c.challengeId, u, 10_000, "http://localhost");
+    }
+    await expect(svc.cancelChallenge(db, c.challengeId, c.userId)).rejects.toThrow(/started/);
+  });
+});

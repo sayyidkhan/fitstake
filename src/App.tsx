@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, money, type Recommendation, type State } from "./api";
+import { api, money, type LobbyEntry, type Recommendation, type State } from "./api";
 import {
   ACTIVITIES,
   ACTIVITY_CATEGORIES,
   DEFAULT_ACTIVITY,
   getActivity,
 } from "../shared/activities";
+import { LEGAL, LegalPage, type LegalPageId } from "./legal";
 
 type Session = { challengeId: string; userId: string };
 const KEY = "fitstake.session";
@@ -111,7 +112,7 @@ const DETAILS = [
   },
   {
     you: "Enrol a card on Reap’s secure hosted page and set a spending ceiling.",
-    app: "Stores only your enrolment reference and your ceiling. Card details stay with Reap.",
+    app: "Stores your name, email, enrolment reference and spending ceiling. Card details stay with Reap.",
     note: "No money is held in escrow. Reap’s automatic payment mandates aren’t available yet, so you approve each final-day charge yourself.",
   },
   {
@@ -180,7 +181,7 @@ function HowItWorks({ onStart }: { onStart: () => void }) {
         </details>
         <details>
           <summary>Where are my card details stored?</summary>
-          <p>With the payment provider, Reap. FitStake keeps only your enrolment reference and the spending ceiling you set.</p>
+          <p>With the payment provider, Reap. FitStake keeps your name, email, enrolment reference and the spending ceiling you set. See the <a className="text-link" href="#privacy">Privacy Policy</a> and <a className="text-link" href="#data-policy">Data Policy</a>.</p>
         </details>
         <details>
           <summary>What if the quote is higher than my ceiling?</summary>
@@ -199,6 +200,16 @@ function HowItWorks({ onStart }: { onStart: () => void }) {
   );
 }
 
+type Page = "home" | "how" | "lobby" | LegalPageId;
+const PAGE_BY_HASH: Record<string, Page> = {
+  "#how-it-works": "how",
+  "#challenges": "lobby",
+  "#privacy": "privacy",
+  "#terms": "terms",
+  "#data-policy": "data-policy",
+};
+const pageFromHash = (): Page => PAGE_BY_HASH[window.location.hash] ?? "home";
+
 const card = "panel";
 const btn = "action";
 const btnQuiet = "action action-quiet";
@@ -208,6 +219,7 @@ const STATUS_LABEL = {
   draft: "Setting up",
   active: "In progress",
   settled: "Finished",
+  cancelled: "Cancelled",
 } as const;
 
 export default function App() {
@@ -216,12 +228,10 @@ export default function App() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [page, setPage] = useState<"home" | "how">(
-    window.location.hash === "#how-it-works" ? "how" : "home",
-  );
+  const [page, setPage] = useState<Page>(pageFromHash);
   useEffect(() => {
     const onHash = () => {
-      setPage(window.location.hash === "#how-it-works" ? "how" : "home");
+      setPage(pageFromHash());
       window.scrollTo(0, 0);
     };
     window.addEventListener("hashchange", onHash);
@@ -255,6 +265,34 @@ export default function App() {
     run(() => api.state(session.challengeId)).then((s) => s && setState(s));
   }, [session, run]);
 
+  // While the challenge is still being set up, poll so a friend joining shows up by itself.
+  const waiting = state?.challenge.status === "draft";
+  useEffect(() => {
+    if (!session || !waiting) return;
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible")
+        api.state(session.challengeId).then(setState).catch(() => {});
+    }, 8000);
+    return () => clearInterval(t);
+  }, [session, waiting]);
+
+  if (page === "privacy" || page === "terms" || page === "data-policy")
+    return (
+      <Shell page={page}>
+        <LegalPage id={page} />
+      </Shell>
+    );
+  if (page === "lobby")
+    return (
+      <Shell page={page}>
+        <Lobby
+          onJoined={(r) => {
+            start(r);
+            window.location.hash = "";
+          }}
+        />
+      </Shell>
+    );
   if (page === "how")
     return (
       <Shell page={page}>
@@ -290,6 +328,34 @@ export default function App() {
           <button className={btnQuiet} onClick={leave}>
             Back to start
           </button>
+        </div>
+      </Shell>
+    );
+
+  if (state.challenge.status === "cancelled")
+    return (
+      <Shell page={page}>
+        <div className="panel cancelled-panel" role="status">
+          <span className="status status-cancelled">Cancelled</span>
+          <h1 className="dashboard-title">{state.challenge.name}</h1>
+          <p className="setup-copy">
+            This challenge was cancelled before it started, so nothing was
+            charged. You can start a new one or join another from the lobby.
+          </p>
+          <div className="button-row">
+            <button className={btn} onClick={leave}>
+              Start a new challenge
+            </button>
+            <button
+              className={btnQuiet}
+              onClick={() => {
+                leave();
+                window.location.hash = "#challenges";
+              }}
+            >
+              Browse open challenges
+            </button>
+          </div>
         </div>
       </Shell>
     );
@@ -362,6 +428,25 @@ export default function App() {
           >
             Refresh
           </button>
+          {challenge.status === "draft" &&
+            state.hostUserId === session.userId && (
+              <button
+                className="text-button danger"
+                disabled={busy}
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      participants.length > 1
+                        ? "Cancel this challenge? Your friend will be told it was cancelled."
+                        : "Cancel this challenge? It will be removed from the lobby.",
+                    )
+                  )
+                    apply(api.cancel(challenge.id, session.userId));
+                }}
+              >
+                Cancel challenge
+              </button>
+            )}
           <button className="text-button" onClick={leave}>
             Back to start
           </button>
@@ -409,7 +494,15 @@ export default function App() {
         <div className="summary-next">
           <dt>Next step</dt>
           <dd>
-            {stepIndex >= 6 ? "All done" : `${stepIndex + 1}. ${WORKFLOW[stepIndex]!.title}`}
+            {stepIndex >= 6
+              ? "All done"
+              : stepIndex === 0
+                ? "Invite your friend"
+                : stepIndex === 1
+                  ? "Lock in your rewards"
+                  : stepIndex === 2
+                    ? "Enrol your card"
+                    : `${stepIndex + 1}. ${WORKFLOW[stepIndex]!.title}`}
           </dd>
         </div>
       </dl>
@@ -434,6 +527,11 @@ export default function App() {
               {p.rewards.length ? (
                 p.rewards.map((r) => (
                   <li key={r.id} className="reward-row">
+                    <ProductImage
+                      id={r.productId}
+                      name={r.productName}
+                      className="row-img"
+                    />
                     <div>
                       <span className="meta">
                         {r.tier === "best" ? "Best reward" : "Little treat"} · {r.merchant}
@@ -458,22 +556,13 @@ export default function App() {
           </div>
         ))}
         {participants.length < 2 && (
-          <div className="panel waiting">
-            <h2>Waiting for your friend</h2>
-            <p>
-              Send them the invite code <code>{challenge.inviteCode}</code>. They
-              choose “Join a friend” on the home page and enter it.
-            </p>
-            <button type="button" className={btnQuiet} onClick={copyCode}>
-              <Icon name={copied ? "check" : "copy"} />
-              {copied ? "Copied" : "Copy invite code"}
-            </button>
-          </div>
+          <InviteCard code={challenge.inviteCode} isPublic={challenge.isPublic} />
         )}
       </section>
 
-      {challenge.status === "draft" && me && participants.length === 2 && (
+      {challenge.status === "draft" && me && (
         <Setup
+          waitingForFriend={participants.length < 2}
           me={me}
           challengeId={challenge.id}
           userId={session.userId}
@@ -627,7 +716,7 @@ export default function App() {
   );
 }
 
-function Shell({ children, page }: { children: React.ReactNode; page: "home" | "how" }) {
+function Shell({ children, page }: { children: React.ReactNode; page: Page }) {
   const [mode, setMode] = useState<{ label: string; tone: "ok" | "warn" | "off" }>({
     label: "Checking…",
     tone: "off",
@@ -660,6 +749,12 @@ function Shell({ children, page }: { children: React.ReactNode; page: "home" | "
             Home
           </a>
           <a
+            href="#challenges"
+            aria-current={page === "lobby" ? "page" : undefined}
+          >
+            Challenges
+          </a>
+          <a
             href="#how-it-works"
             aria-current={page === "how" ? "page" : undefined}
           >
@@ -675,6 +770,14 @@ function Shell({ children, page }: { children: React.ReactNode; page: "home" | "
       </main>
       <footer>
         <span>FitStake · made for your next personal best</span>
+        <nav className="footer-legal" aria-label="Legal">
+          <a href="#privacy">Privacy Policy</a>
+          <a href="#terms">Terms</a>
+          <a href="#data-policy">Data Policy</a>
+          <span>
+            © {new Date().getFullYear()} {LEGAL.operator}
+          </span>
+        </nav>
         <span>
           Simulated fitness. Sandbox purchases. No real money or deliveries.
         </span>
@@ -697,19 +800,21 @@ function Start({
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [title, setTitle] = useState("Our personal best");
-  const [code, setCode] = useState("");
-  const [mode, setMode] = useState<"create" | "join">("create");
+  const invited = new URLSearchParams(window.location.search).get("join") ?? "";
+  const [code, setCode] = useState(invited.toUpperCase().slice(0, 16));
+  const [mode, setMode] = useState<"create" | "join">(invited ? "join" : "create");
   const [rules, setRules] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [days, setDays] = useState(30);
   const [activity, setActivity] = useState(DEFAULT_ACTIVITY);
+  const [isPublic, setIsPublic] = useState(true);
   const daysOk = Number.isInteger(days) && days >= 1 && days <= 365;
   const ok = name.trim().length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     run(() =>
       mode === "create"
-        ? api.create(title.trim(), { name, email }, days, activity)
+        ? api.create(title.trim(), { name, email }, days, activity, isPublic)
         : api.join(code.trim(), { name, email }),
     ).then((r) => r && onStart(r));
   };
@@ -729,6 +834,9 @@ function Start({
         </p>
         <p className="hero-tags">
           <span>One friend, one activity, any length from 1 to 365 days.</span>
+          <a className="text-link" href="#challenges">
+            Browse open challenges
+          </a>
           <a className="text-link" href="#how-it-works">
             See how it works
           </a>
@@ -871,6 +979,17 @@ function Start({
                   Pick 1 to 365 days; settlement happens on the final day.
                 </span>
               </p>
+              <label className="agree">
+                <input
+                  type="checkbox"
+                  checked={isPublic}
+                  onChange={(e) => setIsPublic(e.target.checked)}
+                />
+                <span>
+                  List my challenge in the public lobby so anyone can join.
+                  Untick to keep it invite-only.
+                </span>
+              </label>
             </>
           ) : (
             <label>
@@ -895,9 +1014,18 @@ function Start({
               onChange={(e) => setAgreed(e.target.checked)}
             />
             <span>
-              I agree to the scoring rules: active minutes (capped at
-              90 a day) plus a bonus for each active day. Ties use active
-              days, then steps.
+              I agree to the{" "}
+              <a href="#terms" target="_blank" rel="noopener noreferrer">
+                Terms
+              </a>{" "}
+              and{" "}
+              <a href="#privacy" target="_blank" rel="noopener noreferrer">
+                Privacy Policy
+              </a>
+              , including the scoring rules: active minutes (capped at 90 a
+              day) plus a bonus for each active day. Ties use active days,
+              then steps. I consent to {LEGAL.operator} collecting and using my
+              name and email to run this challenge.
             </span>
           </label>
           {error && (
@@ -965,12 +1093,14 @@ function Start({
 }
 
 function Setup({
+  waitingForFriend,
   me,
   challengeId,
   userId,
   apply,
   busy,
 }: {
+  waitingForFriend: boolean;
   me: State["participants"][number];
   challengeId: string;
   userId: string;
@@ -993,6 +1123,12 @@ function Setup({
 
   return (
     <section className={card + " section setup"}>
+      {waitingForFriend && (
+        <p className="setup-note" role="status">
+          Your friend hasn’t joined yet. You can set up now; the challenge
+          starts once you both have rewards locked and a card enrolled.
+        </p>
+      )}
       <div className="setup-step">
         <p className="meta">Day 1 · your motivation, locked in</p>
         <h2 className="section-title">2. AI recommends rewards</h2>
@@ -1028,11 +1164,21 @@ function Setup({
                 {rec ? "Suggest again" : "Suggest rewards"}
               </button>
             </form>
+            <p className="field-hint prefs-hint">
+              Don’t include health or medical details. Your text is sent to
+              OpenAI to suggest rewards.
+            </p>
             {rec && (
               <>
                 <div className="recommendation-grid">
                   {[rec.lowest, rec.best].map((product) => (
                     <article key={product.id}>
+                      <ProductImage
+                        id={product.id}
+                        name={product.name}
+                        imageUrl={product.imageUrl}
+                        className="rec-img"
+                      />
                       <span className="meta">
                         {product.tier === "best" ? "The bigger win" : "The little treat"}
                       </span>
@@ -1078,6 +1224,14 @@ function Setup({
               {simulated
                 ? "Local demo: simulate enrolment without entering a card. Your ceiling caps the final quote, including shipping and tax. No payment provider is contacted."
                 : "Enrol on Reap’s hosted sandbox page. Your ceiling caps the final quote, including shipping and tax. Each final-day charge needs your approval; no funds are held."}
+            </p>
+            <p className="field-hint setup-privacy">
+              To set this up, your name and email are shared with Reap. Card
+              details are entered only on Reap’s page. See the{" "}
+              <a className="text-link" href="#privacy" target="_blank" rel="noopener noreferrer">
+                Privacy Policy
+              </a>
+              .
             </p>
             <label className="ceiling">
               Spending ceiling
@@ -1145,5 +1299,259 @@ function Setup({
         )}
       </div>
     </section>
+  );
+}
+
+function Lobby({ onJoined }: { onJoined: (s: Session) => void }) {
+  const [list, setList] = useState<LobbyEntry[] | null>(null);
+  const [activity, setActivity] = useState("");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState("");
+  const [joining, setJoining] = useState<string | null>(null);
+  const [agreed, setAgreed] = useState(false);
+  const ok = name.trim().length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && agreed;
+
+  const refresh = useCallback(() => {
+    api
+      .lobby(activity || undefined)
+      .then(setList)
+      .catch((e) => setError(e instanceof Error ? e.message : "Could not load challenges"));
+  }, [activity]);
+
+  useEffect(() => {
+    refresh();
+    // Full challenges drop off the list, so keep it fresh while the page is open.
+    const t = setInterval(() => document.visibilityState === "visible" && refresh(), 10000);
+    return () => clearInterval(t);
+  }, [refresh]);
+
+  const join = async (c: LobbyEntry) => {
+    setError("");
+    setJoining(c.id);
+    try {
+      onJoined(await api.joinLobby(c.id, { name, email }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not join");
+      refresh();
+    } finally {
+      setJoining(null);
+    }
+  };
+
+  return (
+    <section className="lobby">
+      <h1>Pick a challenge to join</h1>
+      <p className="hero-copy">
+        Challenges are created by people like you. Choose one that fits your
+        sport and schedule. When both seats are taken it disappears from this
+        list.
+      </p>
+      <div className={card + " lobby-who"}>
+        <label>
+          Your name
+          <input className={input} value={name} maxLength={60} autoComplete="name" placeholder="What should we call you?" onChange={(e) => setName(e.target.value)} />
+        </label>
+        <label>
+          Email address
+          <input className={input} type="email" value={email} autoComplete="email" placeholder="you@example.com" onChange={(e) => setEmail(e.target.value)} />
+        </label>
+        <label>
+          Activity
+          <select className={input} value={activity} onChange={(e) => setActivity(e.target.value)}>
+            <option value="">All activities</option>
+            {ACTIVITY_CATEGORIES.map((cat) => (
+              <optgroup key={cat} label={cat}>
+                {ACTIVITIES.filter((a) => a.category === cat).map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.label}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </label>
+        <label className="agree">
+          <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+          <span>
+            I agree to the{" "}
+            <a href="#terms" target="_blank" rel="noopener noreferrer">
+              Terms
+            </a>{" "}
+            and{" "}
+            <a href="#privacy" target="_blank" rel="noopener noreferrer">
+              Privacy Policy
+            </a>
+            . I consent to {LEGAL.operator} collecting and using my name and email to join.
+          </span>
+        </label>
+      </div>
+      {error && (
+        <p role="alert" className="error-banner lobby-error">
+          {error}
+        </p>
+      )}
+      <div className="lobby-head">
+        <span role="status">
+          {list ? `${list.length} open ${list.length === 1 ? "challenge" : "challenges"}` : "Loading…"}
+        </span>
+        <button type="button" className="text-link" onClick={refresh}>
+          Refresh
+        </button>
+      </div>
+      {list && list.length === 0 && (
+        <div className="panel lobby-empty">
+          <h2>No open challenges{activity ? " for this activity" : ""} right now</h2>
+          <p>Be the first: create one and others can join whenever they like.</p>
+          <a className={btn} href="#">
+            Create a challenge <Icon name="arrow" />
+          </a>
+        </div>
+      )}
+      <ul className="lobby-list">
+        {list?.map((c) => {
+          const a = getActivity(c.activity);
+          return (
+            <li key={c.id} className="lobby-row">
+              <div>
+                <h2>{c.name}</h2>
+                <p>
+                  {a.label} · {c.durationDays} {c.durationDays === 1 ? "day" : "days"} · hosted by {c.host}
+                </p>
+              </div>
+              <span className="lobby-seats num">
+                {c.players}/{c.maxPlayers} players
+              </span>
+              <button className={btn} disabled={!ok || joining !== null} aria-busy={joining === c.id} onClick={() => join(c)}>
+                {joining === c.id ? "Joining…" : "Join"}
+                <span className="sr-only"> {c.name}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      {!ok && list && list.length > 0 && (
+        <p className="field-hint lobby-hint">Add your name and email, and accept the terms above, to join.</p>
+      )}
+    </section>
+  );
+}
+
+// Product picture: a real photo when the catalogue has one, otherwise a built-in illustration.
+function ProductImage({
+  id,
+  name,
+  imageUrl,
+  className = "",
+}: {
+  id?: string;
+  name: string;
+  imageUrl?: string;
+  className?: string;
+}) {
+  const [broken, setBroken] = useState(false);
+  const key = `${id ?? ""} ${name}`.toLowerCase();
+  if (imageUrl && !broken)
+    return (
+      <img
+        className={`product-img ${className}`}
+        src={imageUrl}
+        alt={name}
+        loading="lazy"
+        onError={() => setBroken(true)}
+      />
+    );
+  const shorts = key.includes("shorts");
+  const drink = key.includes("coconut") || key.includes("water");
+  return (
+    <span className={`product-img product-art ${className}`} role="img" aria-label={name}>
+      <svg viewBox="0 0 120 120" aria-hidden="true">
+        {shorts ? (
+          <>
+            <path d="M28 24h64l-4 20 13 56-40 5-5-38-5 38-40-5 13-56z" fill="#25324d" />
+            <path d="M28 24h64v10H28z" fill="#182238" />
+            <path d="M60 34v32M33 46l-7 44M87 46l10 44" stroke="#5b6b8c" strokeWidth="1.6" />
+            <path d="M57 32l-3 20m9-20 5 20" stroke="#e8e6d0" strokeWidth="1.6" strokeLinecap="round" />
+            <path d="M22 100l16 2M82 102l16-2" stroke="#3a4a6e" strokeWidth="1.6" />
+          </>
+        ) : drink ? (
+          <>
+            <path d="M40 22l8-10h24l8 10v8H40z" fill="#c9a77c" />
+            <path d="M38 30h44v78a4 4 0 0 1-4 4H42a4 4 0 0 1-4-4z" fill="#6b4630" />
+            <path d="M38 30h44v10H38z" fill="#8a5d40" />
+            <circle cx="60" cy="68" r="17" fill="#f3e9d6" />
+            <path d="M52 62q8-9 16 0M50 70q10 9 20 0" fill="none" stroke="#6b4630" strokeWidth="2" strokeLinecap="round" />
+            <rect x="46" y="92" width="28" height="4" rx="2" fill="#f3e9d6" opacity="0.8" />
+          </>
+        ) : (
+          <>
+            <rect x="26" y="50" width="68" height="52" rx="6" fill="#7d9a55" />
+            <rect x="22" y="38" width="76" height="16" rx="5" fill="#9bb870" />
+            <path d="M60 38v64" stroke="#e8f0d2" strokeWidth="6" />
+            <path d="M60 38c-12-18-26-8-18 0M60 38c12-18 26-8 18 0" fill="none" stroke="#e8f0d2" strokeWidth="4" strokeLinecap="round" />
+          </>
+        )}
+      </svg>
+    </span>
+  );
+}
+
+function InviteCard({ code, isPublic }: { code: string; isPublic: boolean }) {
+  const [copied, setCopied] = useState("");
+  const link = `${window.location.origin}/?join=${code}`;
+  const copy = async (what: "code" | "link") => {
+    try {
+      await navigator.clipboard.writeText(what === "code" ? code : link);
+      setCopied(what);
+      setTimeout(() => setCopied(""), 2000);
+    } catch {
+      window.prompt("Copy this:", what === "code" ? code : link);
+    }
+  };
+  return (
+    <div className="panel invite-card">
+      <p className="meta">Step 1 · invite your friend</p>
+      <h2>Send your friend this invite</h2>
+      <p className="setup-copy">
+        {isPublic
+          ? "Your challenge is listed in the Challenges lobby, so anyone can join it. You can also invite someone directly:"
+          : "This challenge is invite-only. Share the link or code with the friend you want:"}
+      </p>
+      <p className="invite-code" aria-label={`Invite code ${code}`}>
+        {code}
+      </p>
+      <div className="button-row">
+        <button type="button" className={btn} onClick={() => copy("link")}>
+          <Icon name={copied === "link" ? "check" : "copy"} />
+          {copied === "link" ? "Link copied" : "Copy invite link"}
+        </button>
+        <button type="button" className={btnQuiet} onClick={() => copy("code")}>
+          <Icon name={copied === "code" ? "check" : "copy"} />
+          {copied === "code" ? "Code copied" : "Copy code"}
+        </button>
+        {typeof navigator.share === "function" && (
+          <button
+            type="button"
+            className={btnQuiet}
+            onClick={() =>
+              navigator
+                .share({
+                  title: "Join my FitStake challenge",
+                  text: `Join my FitStake challenge with code ${code}`,
+                  url: link,
+                })
+                .catch(() => {})
+            }
+          >
+            Share
+          </button>
+        )}
+      </div>
+      <ol className="invite-steps">
+        <li>Your friend opens the link (or goes to FitStake and taps “Join a friend”).</li>
+        <li>They enter their name and email, plus the code above if asked.</li>
+        <li>This page updates by itself when they join. Meanwhile, set up your own rewards and card below.</li>
+      </ol>
+    </div>
   );
 }
