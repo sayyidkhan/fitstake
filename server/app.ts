@@ -8,6 +8,7 @@ import { db } from "./db/client.js";
 import { ACTIVITY_IDS, DEFAULT_ACTIVITY } from "../shared/activities.js";
 import { users } from "./db/schema.js";
 import { getCatalogue } from "./merchants.js";
+import { activateDemoEnrollment } from "./reap.js";
 import * as svc from "./service.js";
 
 const email = z.string().trim().email().max(254);
@@ -213,4 +214,153 @@ app.post("/challenges/:id/settle", requireUser, async (c) => {
   const id = await member(c);
   await svc.settle(db, id);
   return c.json(await svc.getState(db, id));
+});
+
+// Demo-only hosted card enrolment page, used when REAP_API_KEY is not set.
+// It mirrors the real Reap flow so the full "Prepare -> hosted page -> check status"
+// workflow can be demonstrated without touching live payment APIs.
+type DemoCard = { name: string; number: string; expiry: string; cvv: string };
+const DEMO_CARDS: DemoCard[] = [
+  { name: "Demo Visa success", number: "4111111111111111", expiry: "12/30", cvv: "323" },
+  { name: "Demo Mastercard success", number: "5555555555554444", expiry: "12/30", cvv: "323" },
+  { name: "Your test card", number: "62293123261720", expiry: "12/30", cvv: "323" },
+];
+
+app.get("/demo/enrol/:id", (c) => {
+  const returnUrl = c.req.query("returnUrl") ?? "/";
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FitStake demo card enrolment</title>
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #f5f7f2;
+      color: #182a1d;
+      margin: 0;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    main {
+      max-width: 420px;
+      margin: 40px auto;
+      background: #fff;
+      border: 1px solid #dbe4d7;
+      border-radius: 20px;
+      padding: 28px;
+      box-shadow: 0 4px 24px rgba(24, 42, 29, 0.06);
+    }
+    h1 { font-size: 22px; margin: 0 0 8px; }
+    .badge {
+      display: inline-block;
+      background: #eef5d6;
+      color: #3f4d1a;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 999px;
+      margin-bottom: 16px;
+    }
+    p { color: #4a5c4f; margin: 0 0 20px; }
+    label { display: block; font-size: 13px; font-weight: 600; margin: 0 0 6px; color: #314036; }
+    input {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid #c9d4c4;
+      border-radius: 12px;
+      font-size: 16px;
+      margin-bottom: 18px;
+      background: #f9fbf8;
+    }
+    input[readonly] { background: #eef5d6; color: #3f4d1a; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    button {
+      width: 100%;
+      padding: 14px;
+      border: 0;
+      border-radius: 12px;
+      background: #d3e88b;
+      color: #1c2605;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { background: #c8dc7e; }
+    .notice {
+      background: #f5f7f2;
+      border: 1px solid #dbe4d7;
+      border-radius: 12px;
+      padding: 14px;
+      font-size: 13px;
+      color: #4a5c4f;
+      margin-bottom: 22px;
+    }
+    select {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid #c9d4c4;
+      border-radius: 12px;
+      font-size: 16px;
+      margin-bottom: 18px;
+      background: #f9fbf8;
+    }
+    .small { font-size: 12px; color: #6e7f72; margin-top: 18px; text-align: center; }
+  </style>
+</head>
+<body>
+  <main>
+    <span class="badge">Demo only · no real charge</span>
+    <h1>Enrol your card</h1>
+    <p>This is a local simulator page. The real FitStake flow redirects to Reap’s hosted sandbox instead.</p>
+    <div class="notice">
+      <b>Saved demo cards</b><br />
+      Pick a saved test card below, or type your own — this simulator accepts any values.
+    </div>
+    <label for="saved-card">Use a saved demo card</label>
+    <select id="saved-card" aria-label="Saved demo card">
+      ${DEMO_CARDS.map((card, i) => `<option value="${i}">${card.name}</option>`).join("\n      ")}
+    </select>
+    <form method="post" action="/api/demo/enrol/${encodeURIComponent(c.req.param("id"))}?returnUrl=${encodeURIComponent(returnUrl)}">
+      <label for="card">Card number</label>
+      <input id="card" name="card" value="${DEMO_CARDS[0].number}" />
+
+      <div class="row">
+        <div>
+          <label for="expiry">Expiry</label>
+          <input id="expiry" name="expiry" value="${DEMO_CARDS[0].expiry}" />
+        </div>
+        <div>
+          <label for="cvv">CVV</label>
+          <input id="cvv" name="cvv" value="${DEMO_CARDS[0].cvv}" />
+        </div>
+      </div>
+
+      <button type="submit">Complete demo enrolment</button>
+    </form>
+    <p class="small">Card details are not stored or validated in demo mode.</p>
+  </main>
+  <script>
+    const cards = ${JSON.stringify(DEMO_CARDS)};
+    const select = document.getElementById('saved-card');
+    function fill(i) {
+      const c = cards[i];
+      document.getElementById('card').value = c.number;
+      document.getElementById('expiry').value = c.expiry;
+      document.getElementById('cvv').value = c.cvv;
+    }
+    select.addEventListener('change', (e) => fill(e.target.value));
+  </script>
+</body>
+</html>`;
+  return c.html(html);
+});
+
+app.post("/demo/enrol/:id", (c) => {
+  activateDemoEnrollment(c.req.param("id"));
+  const returnUrl = c.req.query("returnUrl");
+  return c.redirect(returnUrl && returnUrl.startsWith("http") ? returnUrl : "/");
 });

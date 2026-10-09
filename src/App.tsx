@@ -581,10 +581,20 @@ function AppInner() {
             aria-current={i === stepIndex ? "step" : undefined}
             className={i === stepIndex ? "current" : i < stepIndex ? "done" : ""}
           >
-            <span className="journey-mark">
-              {i < stepIndex ? <Icon name="check" /> : i + 1}
-            </span>
-            {step.short}
+            <button
+              type="button"
+              className="journey-button"
+              onClick={() => {
+                const targets = ["step-create", "step-rewards", "step-authorise", "step-compete", "step-results", "step-results"];
+                const id = targets[i];
+                if (id) document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+            >
+              <span className="journey-mark">
+                {i < stepIndex ? <Icon name="check" /> : i + 1}
+              </span>
+              {step.short}
+            </button>
           </li>
         ))}
       </ol>
@@ -688,7 +698,7 @@ function AppInner() {
       )}
 
       {challenge.status !== "draft" && (
-        <section className={card + " section"}>
+        <section className={card + " section"} id="step-compete">
           <p className="meta">{stepDay(3, challenge.durationDays)}</p>
           <h2 className="section-title">4. Compete and improve</h2>
           {leaderboard[0] && leaderboard[0].points > 0 ? (
@@ -756,7 +766,7 @@ function AppInner() {
       )}
 
       {challenge.status === "settled" && (
-        <section className={card + " section"}>
+        <section className={card + " section"} id="step-results">
           <p className="meta">Day {challenge.durationDays}</p>
           <h2 className="section-title">
             5. Results: {nameOf(challenge.winnerUserId)} wins
@@ -1308,7 +1318,7 @@ function Setup({
           starts once you both have rewards locked and a card enrolled.
         </p>
       )}
-      <div className="setup-step">
+      <div className="setup-step" id="step-rewards">
         <p className="meta">Day 1 · your motivation, locked in</p>
         <h2 className="section-title">2. AI recommends rewards</h2>
         {locked ? (
@@ -1421,7 +1431,7 @@ function Setup({
           </>
         )}
       </div>
-      <div className="setup-step">
+      <div className="setup-step" id="step-authorise">
         <h2 className="section-title">3. Pre-authorise payment</h2>
         {!locked ? (
           <p className="setup-copy">
@@ -1433,7 +1443,7 @@ function Setup({
               <>
                 <p className="setup-copy">
                   {simulated
-                    ? "Local demo: simulate enrolment without entering a card. Your cap limits the final quote, including shipping and tax. No payment provider is contacted."
+                    ? "Demo mode: open the simulator card page, then complete enrolment. Your cap limits the final quote, including shipping and tax. No payment provider is contacted."
                     : "Enrol on Reap’s hosted sandbox page. Your cap limits the final quote, including shipping and tax. Each final-day charge needs your approval; no funds are held."}
                 </p>
                 <p className="field-hint setup-privacy">
@@ -1507,7 +1517,7 @@ function Setup({
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  Open Reap enrolment
+                  {simulated ? "Open demo enrolment" : "Open Reap enrolment"}
                   <span className="sr-only"> (opens in a new tab)</span>
                 </a>
               )}

@@ -47,16 +47,43 @@ export interface ReapClient {
   getCheckout(checkoutId: string): Promise<CheckoutResult>;
 }
 
+// In-memory demo enrollment state. Shared across SandboxReap instances and the
+// demo enrolment page routes so the "Prepare -> hosted page -> check status"
+// flow can be exercised without a live Reap key.
+const demoEnrolments = new Map<string, { active: boolean }>();
+
+export function isDemoEnrollment(id: string): boolean {
+  return demoEnrolments.has(id);
+}
+
+export function activateDemoEnrollment(id: string): void {
+  const e = demoEnrolments.get(id);
+  if (e) e.active = true;
+}
+
 class SandboxReap implements ReapClient {
-  async createEnrollment({ userId }: { userId: string }) {
+  async createEnrollment({
+    userId,
+    returnUrl,
+    idempotencyKey,
+  }: Parameters<ReapClient["createEnrollment"]>[0]) {
+    const enrollmentId = `sim_enr_${userId.slice(0, 8)}_${idempotencyKey.slice(-8)}`;
+    // For integration tests that exercise settlement, skip the hosted demo page
+    // and immediately activate the enrollment.
+    const autoApprove = process.env.REAP_SIMULATE_AUTO_APPROVE === "true";
+    const approvalUrl = autoApprove
+      ? null
+      : `/api/demo/enrol/${encodeURIComponent(enrollmentId)}?returnUrl=${encodeURIComponent(returnUrl)}`;
+    demoEnrolments.set(enrollmentId, { active: autoApprove });
     return {
-      enrollmentId: `sim_enr_${userId.slice(0, 8)}`,
-      active: true,
-      approvalUrl: null,
+      enrollmentId,
+      active: autoApprove,
+      approvalUrl,
     };
   }
-  async getEnrollment() {
-    return { active: true, failed: false };
+  async getEnrollment(id: string) {
+    const e = demoEnrolments.get(id);
+    return { active: e?.active ?? false, failed: false };
   }
   async quote({ product }: { product: Product }) {
     return {

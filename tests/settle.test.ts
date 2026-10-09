@@ -5,6 +5,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 process.env.TURSO_DATABASE_URL = `file:${join(mkdtempSync(join(tmpdir(), "fitstake-")), "t.db")}`;
 delete process.env.TURSO_AUTH_TOKEN;
+process.env.REAP_SIMULATE_AUTO_APPROVE = "true";
 
 let svc: typeof import("../server/service");
 let db: typeof import("../server/db/client").db;
