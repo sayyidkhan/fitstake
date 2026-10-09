@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { api, ApiError, money, type AuthUser, type MyChallenge, type LobbyEntry, type Product, type Recommendation, type State } from "./api";
 import { priceBand } from "../shared/pricing";
 import {
@@ -939,6 +939,7 @@ function Start({
   busy: boolean;
   error: string;
 }) {
+  const onboardingRef = useRef<HTMLElement>(null);
   const [title, setTitle] = useState("Our personal best");
   const invited = new URLSearchParams(window.location.search).get("join") ?? "";
   const [code, setCode] = useState(invited.toUpperCase().slice(0, 16));
@@ -960,30 +961,62 @@ function Start({
   return (
     <>
     <div className="landing-grid">
-      <section className="hero">
-        <h1>
-          Good habits.
-          <br />
-          Friendly rivalry.
-          <br />
+      <section className="hero" aria-labelledby="hero-title">
+        <p className="hero-eyebrow"><span /> A little rivalry. A healthier you.</p>
+        <h1 id="hero-title">
+          Good habits.<br />
+          Friendly rivalry.<br />
           <em>Better rewards.</em>
         </h1>
         <p className="hero-copy">
-          Turn “we should work out” into a commitment. Challenge a
-          friend, build a healthier routine, and make every active day count.
+          You bring a friend. We bring the motivation. Build a healthier
+          routine together, with rewards worth showing up for.
         </p>
-        <p className="hero-tags">
-          <span>One friend, one activity, any length from 1 to 365 days.</span>
-          <a className="text-link" href="#challenges">
-            Browse open challenges
-          </a>
-          <a className="text-link" href="#how-it-works">
-            See how it works
-          </a>
-        </p>
+        <div className="hero-actions">
+          <button className="action hero-primary" onClick={() => {
+            onboardingRef.current?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" });
+            onboardingRef.current?.focus({ preventScroll: true });
+          }}>
+            Start a challenge <Icon name="arrow" />
+          </button>
+          <a className="hero-secondary" href="#challenges">Explore challenges <Icon name="arrow" /></a>
+        </div>
+        <p className="hero-note">Two friends · Your activity · Your pace</p>
       </section>
-      <div className="landing-side">
-        <section className="onboarding panel" aria-labelledby="onboarding-title">
+      <aside className="pitch-panel" aria-labelledby="pitch-title">
+        <div className="pitch-heading">
+          <span className="meta" id="pitch-title">MEET FITSTAKE</span>
+          <span className="pitch-tag">The friendly fitness challenge</span>
+        </div>
+        <div className="pitch-stage">
+          <span className="pitch-orbit" aria-hidden="true" />
+          <video
+            className="cta-video"
+            src="/videos/fitstake-cta.mp4"
+            poster="/videos/fitstake-cta-poster.jpg"
+            playsInline
+            preload="none"
+            controls
+            aria-label="Watch the FitStake pitch"
+          />
+          <div className="pitch-sticker"><Icon name="check" /><span>Show up.<br /><strong>It pays off.</strong></span></div>
+        </div>
+        <p className="pitch-caption">A friend. A goal. Something to play for.</p>
+      </aside>
+    </div>
+    <div className="landing-start">
+      <section className="landing-explainer" aria-labelledby="landing-explainer-title">
+        <p className="meta">THE GAME PLAN</p>
+        <h2 id="landing-explainer-title">Small commitments.<br />Something to play for.</h2>
+        <ol className="landing-steps">
+          <li><span>01</span><div><h3>Make it a friendly challenge.</h3><p>Pick an activity, invite a friend, and choose 1 to 365 days.</p></div></li>
+          <li><span>02</span><div><h3>Put a little motivation on the line.</h3><p>Choose your rewards and agree on a spending cap.</p></div></li>
+          <li><span>03</span><div><h3>Stay consistent. Enjoy the payoff.</h3><p>The loser buys the winner’s best reward. The winner buys the loser’s lowest. Both get something.</p></div></li>
+        </ol>
+        <a className="text-link" href="#how-it-works">See the full rules <Icon name="arrow" /></a>
+        <p className="landing-demo-note"><Icon name="shield" /> Try the demo. Activity is simulated; no real money moves.</p>
+      </section>
+      <section ref={onboardingRef} tabIndex={-1} className="onboarding panel" aria-label={me ? "Set up your challenge" : "Sign in to start your challenge"}>
         {!me ? (
           <AuthCard onAuthed={onAuthed} />
         ) : (
@@ -1166,22 +1199,7 @@ function Start({
           </>
         )}
       </section>
-      <div className="cta-video-wrap">
-        <p className="meta">WATCH THE PITCH</p>
-        <video
-          className="cta-video"
-          src="/videos/fitstake-cta.mp4"
-          poster="/videos/fitstake-cta-poster.jpg"
-          playsInline
-          muted
-          loop
-          autoPlay
-          controls
-          aria-label="FitStake CTA video"
-        />
-      </div>
     </div>
-  </div>
   {me && <MyChallenges onOpen={onStart} />}
     </>
   );
