@@ -17,6 +17,8 @@ export const challenges = sqliteTable("challenges", {
   name: text("name").notNull(),
   inviteCode: text("invite_code").notNull().unique(),
   durationDays: integer("duration_days").notNull().default(30),
+  // Activity id from shared/activities.ts
+  activity: text("activity").notNull().default("any"),
   // draft -> active (both rewards locked + authorised) -> settled
   status: text("status", { enum: ["draft", "active", "settled"] }).notNull().default("draft"),
   startedAt: integer("started_at", { mode: "timestamp" }),

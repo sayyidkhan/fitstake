@@ -12,6 +12,7 @@ export type State = {
     name: string;
     inviteCode: string;
     durationDays: number;
+    activity: string;
     status: "draft" | "active" | "settled";
     winnerUserId: string | null;
     loserUserId: string | null;
@@ -77,10 +78,11 @@ export const api = {
     name: string,
     creator: { name: string; email: string },
     durationDays: number,
+    activity: string,
   ) =>
     call<{ challengeId: string; userId: string; inviteCode: string }>(
       "/challenges",
-      { name, creator, durationDays },
+      { name, creator, durationDays, activity },
     ),
   join: (inviteCode: string, p: { name: string; email: string }) =>
     call<{ challengeId: string; userId: string }>("/join", {

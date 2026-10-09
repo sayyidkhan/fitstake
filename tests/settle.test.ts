@@ -85,3 +85,30 @@ describe("challenge length", () => {
     expect((await svc.getState(db, a.challengeId)).challenge.durationDays).toBe(30);
   });
 });
+
+describe("activity type", () => {
+  it("stores the activity and tailors simulated steps", async () => {
+    const mk = async (activity?: string) => {
+      const a = await svc.createChallenge(db, { name: "a", activity, creator: { name: "A", email: `a${crypto.randomUUID()}@x.io` } });
+      const b = await svc.joinChallenge(db, a.inviteCode, { name: "B", email: `b${crypto.randomUUID()}@x.io` });
+      for (const u of [a.userId, b.userId]) {
+        await svc.lockRewards(db, a.challengeId, u, "sixeleven-cococoast-500ml", "kydra-axis-linerless-shorts-navy-m");
+        await svc.authorize(db, a.challengeId, u, 10_000, "http://localhost");
+      }
+      await svc.simulateActivity(db, a.challengeId);
+      return svc.getState(db, a.challengeId);
+    };
+    const swim = await mk("swimming");
+    expect(swim.challenge.activity).toBe("swimming");
+    expect(swim.leaderboard.every((l) => l.totalSteps === 0)).toBe(true);
+    const run = await mk("running");
+    expect(run.leaderboard.every((l) => l.totalSteps > 1000)).toBe(true);
+    expect((await mk()).challenge.activity).toBe("any");
+  });
+
+  it("has unique ids and a valid default", async () => {
+    const { ACTIVITIES, DEFAULT_ACTIVITY } = await import("../shared/activities");
+    expect(new Set(ACTIVITIES.map((a) => a.id)).size).toBe(ACTIVITIES.length);
+    expect(ACTIVITIES.some((a) => a.id === DEFAULT_ACTIVITY)).toBe(true);
+  });
+});

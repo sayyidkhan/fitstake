@@ -342,7 +342,7 @@ footer {
 }
 .dashboard-stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   border: 1px solid #dce5cf;
   border-radius: 15px;
   background: #edf2e4;
@@ -891,5 +891,20 @@ footer {
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
+  }
+}
+.activity-chip {
+  display: inline-block;
+  margin: 8px 0 4px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: #e5efd3;
+  font-size: 12px;
+  font-weight: 600;
+  color: #3b5430;
+}
+@media (max-width: 900px) {
+  .dashboard-stats {
+    grid-template-columns: repeat(2, 1fr);
   }
 }

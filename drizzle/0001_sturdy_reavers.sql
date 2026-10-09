@@ -1,0 +1,1 @@
+ALTER TABLE `challenges` ADD `activity` text DEFAULT 'any' NOT NULL;

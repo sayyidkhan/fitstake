@@ -2,6 +2,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import type { DB } from "./db/client.js";
 import * as t from "./db/schema.js";
 import { findProduct } from "./merchants.js";
+import { getActivity } from "../shared/activities.js";
 import { getReap, type CheckoutResult, type ReapClient } from "./reap.js";
 import { decide, rank, scoreUser } from "./scoring.js";
 
@@ -21,10 +22,10 @@ async function upsertUser(db: DB, name: string, email: string) {
   return created!;
 }
 
-export async function createChallenge(db: DB, input: { name: string; creator: { name: string; email: string }; durationDays?: number }) {
+export async function createChallenge(db: DB, input: { name: string; creator: { name: string; email: string }; durationDays?: number; activity?: string }) {
   const user = await upsertUser(db, input.creator.name, input.creator.email);
   const inviteCode = crypto.randomUUID().slice(0, 8).toUpperCase();
-  const [challenge] = await db.insert(t.challenges).values({ name: input.name, inviteCode, durationDays: input.durationDays ?? 30 }).returning();
+  const [challenge] = await db.insert(t.challenges).values({ name: input.name, inviteCode, durationDays: input.durationDays ?? 30, activity: input.activity ?? "any" }).returning();
   await db.insert(t.participants).values({ challengeId: challenge!.id, userId: user.id });
   return { challengeId: challenge!.id, userId: user.id, inviteCode };
 }
@@ -164,6 +165,7 @@ function mulberry32(seed: number) {
 
 export async function simulateActivity(db: DB, challengeId: string) {
   const c = await requireStatus(db, challengeId, "active");
+  const { stepsPerMinute } = getActivity(c.activity);
   const people = await db.select().from(t.participants).where(eq(t.participants.challengeId, challengeId));
   await db.delete(t.activityLogs).where(eq(t.activityLogs.challengeId, challengeId));
   const rows = people.flatMap((p) => {
@@ -171,7 +173,7 @@ export async function simulateActivity(db: DB, challengeId: string) {
     const rand = mulberry32(seed);
     return Array.from({ length: c.durationDays }, (_, i) => {
       const activeMinutes = Math.round(15 + rand() * 60);
-      return { challengeId, userId: p.userId, day: i + 1, activeMinutes, steps: Math.round(activeMinutes * (90 + rand() * 40)) };
+      return { challengeId, userId: p.userId, day: i + 1, activeMinutes, steps: Math.round(activeMinutes * stepsPerMinute * (0.85 + rand() * 0.3)) };
     });
   });
   await db.insert(t.activityLogs).values(rows);

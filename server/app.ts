@@ -3,6 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { recommend } from "./ai.js";
 import { db } from "./db/client.js";
+import { ACTIVITY_IDS, DEFAULT_ACTIVITY } from "../shared/activities.js";
 import { users } from "./db/schema.js";
 import { CATALOGUE } from "./merchants.js";
 import * as svc from "./service.js";
@@ -63,6 +64,7 @@ app.post(
       creator: person,
       // Any length from a single day up to a year.
       durationDays: z.number().int().min(1).max(365).default(30),
+      activity: z.enum(ACTIVITY_IDS).default(DEFAULT_ACTIVITY),
     }),
   ),
   async (c) => c.json(await svc.createChallenge(db, c.req.valid("json")), 201),

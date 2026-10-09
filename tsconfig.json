@@ -11,5 +11,5 @@
     "isolatedModules": true,
     "types": ["node"]
   },
-  "include": ["src", "server", "api", "vite.config.ts", "drizzle.config.ts"]
+  "include": ["src", "server", "shared", "api", "vite.config.ts", "drizzle.config.ts"]
 }

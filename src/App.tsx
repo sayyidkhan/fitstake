@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, money, type Recommendation, type State } from "./api";
+import {
+  ACTIVITIES,
+  ACTIVITY_CATEGORIES,
+  DEFAULT_ACTIVITY,
+  getActivity,
+} from "../shared/activities";
 
 type Session = { challengeId: string; userId: string };
 const KEY = "fitstake.session";
@@ -26,7 +32,7 @@ function stepDay(i: number, days?: number): string {
 }
 
 const WORKFLOW = [
-  { title: "Create a challenge", short: "Create", copy: "Choose how many days, invite friends, and agree on scoring rules" },
+  { title: "Create a challenge", short: "Create", copy: "Pick an activity and how many days, invite friends, and agree on scoring rules" },
   { title: "AI recommends rewards", short: "Rewards", copy: "Each friend locks in their lowest reward and best reward" },
   { title: "Pre-authorise payment", short: "Authorise", icon: "shield", copy: "Each friend registers a card and approves spending rules through Reap" },
   { title: "Compete and improve", short: "Compete", copy: "Track healthy progress, complete personal goals and climb the leaderboard" },
@@ -81,7 +87,7 @@ function Workflow({ days }: { days?: number }) {
 
 const DETAILS = [
   {
-    you: "Name the challenge, invite one friend with a code, and both of you agree to the scoring rules.",
+    you: "Pick the activity (running, swimming, badminton and more) and how many days, invite one friend with a code, and both of you agree to the scoring rules.",
     app: "Sets the challenge window you chose (from a single day up to a year) and shows the same scoring rules to both players. The rules are fixed from the start.",
     note: "Scoring rewards consistency: active minutes (capped at 90 a day) plus a bonus for every day with 30+ minutes. There are no weight-loss targets.",
   },
@@ -283,6 +289,10 @@ export default function App() {
         <div>
           <p className="eyebrow">YOUR CHALLENGE HQ</p>
           <h1 className="dashboard-title">{challenge.name}</h1>
+          <p className="activity-chip">
+            <span aria-hidden="true">{getActivity(challenge.activity).icon}</span>{" "}
+            {getActivity(challenge.activity).label}
+          </p>
           <p className="text-sm text-slate-400">
             Status: <b className="text-teal-400">{challenge.status}</b> · Invite
             code: <b>{challenge.inviteCode}</b>
@@ -331,6 +341,13 @@ export default function App() {
           <span>THE COMMITMENT</span>
           <strong>
             {challenge.durationDays} <small>{challenge.durationDays === 1 ? "day" : "days"}</small>
+          </strong>
+        </div>
+        <div>
+          <span>THE ACTIVITY</span>
+          <strong className="next-step">
+            {getActivity(challenge.activity).icon}{" "}
+            {getActivity(challenge.activity).label.split(" (")[0]}
           </strong>
         </div>
         <div>
@@ -443,7 +460,8 @@ export default function App() {
                   </div>
                   <p>
                     {s.adherentDays} active days ·{" "}
-                    {s.totalSteps.toLocaleString()} steps ·{" "}
+                    {getActivity(challenge.activity).stepsPerMinute > 0 &&
+                      `${s.totalSteps.toLocaleString()} steps · `}
                     {Math.round((s.points / maxPoints) * 100)}% of maximum score
                   </p>
                 </li>
@@ -617,13 +635,14 @@ function Start({
   const [rules, setRules] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [days, setDays] = useState(30);
+  const [activity, setActivity] = useState(DEFAULT_ACTIVITY);
   const daysOk = Number.isInteger(days) && days >= 1 && days <= 365;
   const ok = name.trim().length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     run(() =>
       mode === "create"
-        ? api.create(title.trim(), { name, email }, days)
+        ? api.create(title.trim(), { name, email }, days, activity)
         : api.join(code.trim(), { name, email }),
     ).then((r) => r && onStart(r));
   };
@@ -747,6 +766,30 @@ function Start({
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                   />
+                </label>
+                <label>
+                  Activity
+                  <select
+                    className={input}
+                    value={activity}
+                    onChange={(e) => setActivity(e.target.value)}
+                  >
+                    {ACTIVITY_CATEGORIES.map((cat) => (
+                      <optgroup key={cat} label={cat}>
+                        {ACTIVITIES.filter((a) => a.category === cat).map(
+                          (a) => (
+                            <option key={a.id} value={a.id}>
+                              {a.icon} {a.label}
+                            </option>
+                          ),
+                        )}
+                      </optgroup>
+                    ))}
+                  </select>
+                  <small className="field-hint">
+                    Both players do this activity. Scoring counts active
+                    minutes, so any activity is fair.
+                  </small>
                 </label>
                 <label>
                   Challenge length (days)
