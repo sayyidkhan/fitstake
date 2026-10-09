@@ -146,7 +146,7 @@ class LiveReap implements ReapClient {
 export function getReap(): ReapClient {
   const key = process.env.REAP_API_KEY;
   if (!key) return new SandboxReap();
-  const version = process.env.REAP_VERSION;
-  if (!version) throw new Error("REAP_VERSION is required when REAP_API_KEY is set");
+  // Latest per https://docs.reap.global/api-reference/overview; override with REAP_VERSION.
+  const version = process.env.REAP_VERSION || "2025-02-14";
   return new LiveReap(key, version, process.env.REAP_BASE_URL || "https://sandbox.api.reap.global");
 }
