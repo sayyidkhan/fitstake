@@ -1303,6 +1303,10 @@ function AuthCard({ onAuthed }: { onAuthed: (u: AuthUser) => void }) {
   const [busy, setBusy] = useState(false);
   const [wait, setWait] = useState(0);
   const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const [demo, setDemo] = useState(false);
+  useEffect(() => {
+    api.config().then((c) => setDemo(c.auth === "demo")).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (wait <= 0) return;
@@ -1315,7 +1319,22 @@ function AuthCard({ onAuthed }: { onAuthed: (u: AuthUser) => void }) {
     setError("");
     try {
       const r = await api.requestCode(email.trim());
-      setDevCode(r.devCode ?? null);
+      if (r.devCode) {
+        // Demo mode: no email is sent, so sign in straight away with the code the server returned.
+        try {
+          const v = await api.verify({
+            email: email.trim(),
+            code: r.devCode,
+            ...(mode === "signup" ? { name: name.trim(), acceptedTerms: terms } : {}),
+          });
+          onAuthed(v.user);
+          return;
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "Could not sign you in");
+          return;
+        }
+      }
+      setDevCode(null);
       setStep("code");
       setCode("");
       setWait(30);
@@ -1350,7 +1369,9 @@ function AuthCard({ onAuthed }: { onAuthed: (u: AuthUser) => void }) {
       <h2>{mode === "signup" ? "Create your account" : "Welcome back"}</h2>
       <p className="auth-sub">
         {step === "email"
-          ? "No password needed. We’ll email you a 6-digit code."
+          ? demo
+            ? "Demo mode: sign in instantly. No email or password needed."
+            : "No password needed. We’ll email you a 6-digit code."
           : <>We sent a code to <b>{email.trim()}</b>. It expires in 10 minutes.</>}
       </p>
       {step === "email" ? (
@@ -1389,7 +1410,7 @@ function AuthCard({ onAuthed }: { onAuthed: (u: AuthUser) => void }) {
             )}
             {error && <p role="alert" className="error-banner">{error}</p>}
             <button className={btn + " submit-action"} disabled={busy || !emailOk || (mode === "signup" && (!name.trim() || !terms))}>
-              {busy ? "Sending…" : "Email me a code"}
+              {busy ? (demo ? "Signing in…" : "Sending…") : demo ? (mode === "signup" ? "Create demo account" : "Log in") : "Email me a code"}
               <span>→</span>
             </button>
           </form>

@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { destroyAllSessions, destroySession, requestLoginCode, verifyLoginCode } from "./auth.js";
+import { destroyAllSessions, destroySession, devCodeAllowed, requestLoginCode, verifyLoginCode } from "./auth.js";
 import { clearSessionCookie, requireUser, sameOrigin, sessionToken, setSessionCookie, type Env } from "./session.js";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
@@ -41,6 +41,8 @@ app.get("/health", async (c) => {
 });
 app.get("/config", (c) =>
   c.json({
+    // "demo": sign-in needs no email (codes are filled in automatically). Never enable for real users.
+    auth: devCodeAllowed() ? "demo" : "email",
     payments: !process.env.REAP_API_KEY
       ? "simulated"
       : [
