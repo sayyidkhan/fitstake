@@ -30,7 +30,7 @@ Optional local run: `cp .env.example .env`, fill it in, then `npm run dev` (web 
 The site serves three pages at `#privacy`, `#terms` and `#data-policy`, with source in `src/legal.tsx`. They are a PDPA-oriented draft and must be reviewed by Singapore counsel before launch.
 
 - Fill in every highlighted placeholder in `src/legal.tsx` (`LEGAL` block and any bracketed text): UEN, registered address, DPO/privacy email, liability cap, retention periods and the Reap notice reference.
-- Users accept the current `TERMS_VERSION` (`server/legal.ts`) when they create or join a challenge. The server rejects requests without `acceptedTerms: true`, and the acceptance version and time are stored on the user. Bump `TERMS_VERSION` and `LEGAL.lastUpdated` whenever the pages change materially.
+- Users accept the current `TERMS_VERSION` (`server/legal.ts`) **once, when they create their account** (sign-up requires `acceptedTerms: true`). The accepted version and time are stored on the user. Bump `TERMS_VERSION` and `LEGAL.lastUpdated` whenever the pages change materially.
 - Real-money purchases and real activity data must not be enabled until the gambling, lottery and payment-services questions in the Terms (section 1) are confirmed with counsel.
 
 ## Local UI preview and assessment
@@ -41,4 +41,4 @@ Use Node 22.9+ (Node 24 recommended). Run `npm install`, create `.env`, then `np
 
 Run `node --env-file=.env scripts/check-reap.mjs` for a read-only authenticated catalogue check. It prints status/product count without exposing credentials. Reap hosted flows require an HTTPS return URL; the localhost preview is intended for UI and simulated-flow verification.
 
-Never commit `.env` or card details. Set rotated server credentials in the deployment environment. The app remains a hackathon POC without production authentication or verified live payment completion.
+Never commit `.env` or card details. Set rotated server credentials in the deployment environment. The app is a hackathon POC: accounts use email-code login (demo mode `AUTH_DEV_CODE=true` skips verification and must not be used with real users), and live payment completion is not yet verified. See `docs/HANDOFF.md` for the full project handoff.
