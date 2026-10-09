@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, money, type LobbyEntry, type Product, type Recommendation, type State } from "./api";
 import { priceBand } from "../shared/pricing";
 import {
@@ -1060,7 +1060,25 @@ function Lobby({ onJoined }: { onJoined: (s: Session) => void }) {
     return () => clearInterval(t);
   }, [refresh]);
 
+  const whoRef = useRef<HTMLDivElement>(null);
+  const missing = () =>
+    !name.trim()
+      ? "Enter your name first"
+      : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+        ? "Enter a valid email address"
+        : !agreed
+          ? "Tick the box to accept the Terms and Privacy Policy"
+          : "";
+
   const join = async (c: LobbyEntry) => {
+    const why = missing();
+    if (why) {
+      // Buttons used to be silently disabled with the form scrolled out of view; explain and scroll back to it.
+      setError(why + " before joining.");
+      whoRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      whoRef.current?.querySelector("input")?.focus({ preventScroll: true });
+      return;
+    }
     setError("");
     setJoining(c.id);
     try {
@@ -1082,7 +1100,7 @@ function Lobby({ onJoined }: { onJoined: (s: Session) => void }) {
         sport and schedule. When both seats are taken it disappears from this
         list.
       </p>
-      <div className={card + " lobby-who"}>
+      <div ref={whoRef} className={card + " lobby-who"}>
         <label>
           Your name
           <input className={input} value={name} maxLength={60} autoComplete="name" placeholder="What should we call you?" onChange={(e) => setName(e.target.value)} />
@@ -1158,7 +1176,7 @@ function Lobby({ onJoined }: { onJoined: (s: Session) => void }) {
               <span className="lobby-seats">
                 {c.players}/{c.maxPlayers} players
               </span>
-              <button className={btn} disabled={!ok || joining !== null} onClick={() => join(c)} title={ok ? undefined : "Enter your name and email first"}>
+              <button className={btn} disabled={joining !== null} onClick={() => join(c)}>
                 {joining === c.id ? "Joining…" : "Join"}
               </button>
             </li>
@@ -1166,6 +1184,11 @@ function Lobby({ onJoined }: { onJoined: (s: Session) => void }) {
         })}
       </ul>
       {!ok && list && list.length > 0 && <p className="field-hint">Add your name and email, and accept the terms above, to join.</p>}
+      {joining && (
+        <p role="status" className="field-hint">
+          Joining…
+        </p>
+      )}
     </section>
   );
 }
