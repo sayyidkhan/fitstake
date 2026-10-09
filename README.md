@@ -15,3 +15,13 @@ Optional local run: `cp .env.example .env`, fill it in, then `npm run dev` (web 
 - Only mandate terms are stored. No card data or API keys in the browser or DB.
 - Settlement is idempotent (unique key per reward purchase, claimed before checkout).
 - Outcome-dependent purchases may count as restricted gambling: get organiser clearance. No real-money staking.
+
+## Local UI preview and assessment
+
+See `docs/PRODUCT_ASSESSMENT.md` for product direction, verified flows, and pilot prerequisites. UI captures are in `docs/ui-preview.jpg` and `docs/challenge-preview.jpg`.
+
+Use Node 22.9+ (Node 24 recommended). Run `npm install`, create `.env`, then `npm run db:migrate` and `npm run dev`. The API and migration commands load `.env` automatically. For isolated local development use `TURSO_DATABASE_URL=file:local.db`. Leave `REAP_API_KEY` empty to exercise the complete local simulator. Set a sandbox key and `REAP_BASE_URL=https://sg.sandbox.api.reap.global` for the Singapore Reap adapter. A connected badge indicates configuration, not a completed checkout.
+
+Run `node --env-file=.env scripts/check-reap.mjs` for a read-only authenticated catalogue check. It prints status/product count without exposing credentials. Reap hosted flows require an HTTPS return URL; the localhost preview is intended for UI and simulated-flow verification.
+
+Never commit `.env` or card details. Set rotated server credentials in the deployment environment. The app remains a hackathon POC without production authentication or verified live payment completion.
