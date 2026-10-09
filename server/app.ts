@@ -1,11 +1,11 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { recommend } from "./ai";
-import { db } from "./db/client";
-import { users } from "./db/schema";
-import { CATALOGUE } from "./merchants";
-import * as svc from "./service";
+import { recommend } from "./ai.js";
+import { db } from "./db/client.js";
+import { users } from "./db/schema.js";
+import { CATALOGUE } from "./merchants.js";
+import * as svc from "./service.js";
 
 const person = z.object({ name: z.string().min(1).max(60), email: z.string().email() });
 const ids = z.object({ userId: z.string().min(1) });
