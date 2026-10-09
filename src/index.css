@@ -395,6 +395,17 @@ footer {
   border-radius: 8px;
   font-size: 13px;
 }
+.success-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  background: #e8f5e0;
+  color: #2f5d1c;
+  border-radius: 8px;
+  font-size: 14px;
+}
 .bg-red-950 {
   background: #fff1ed;
 }
