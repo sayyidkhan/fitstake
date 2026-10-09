@@ -2,7 +2,7 @@ import { createHash, randomBytes, randomInt, timingSafeEqual } from "node:crypto
 import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
 import type { DB } from "./db/client.js";
 import * as t from "./db/schema.js";
-import { sendEmail } from "./email.js";
+import { emailConfigured, sendEmail } from "./email.js";
 import { TERMS_VERSION } from "./legal.js";
 import { HttpError } from "./service.js";
 
@@ -28,7 +28,7 @@ const hashCode = (email: string, code: string) => sha256(`${secret()}:${email}:$
 
 // Local dev and explicit demo mode can show the code on screen instead of emailing it. Never enabled by default on Vercel.
 export const devCodeAllowed = () =>
-  process.env.AUTH_DEV_CODE === "true" || (!process.env.VERCEL && !process.env.RESEND_API_KEY);
+  process.env.AUTH_DEV_CODE === "true" || (!process.env.VERCEL && !emailConfigured());
 
 export async function requestLoginCode(db: DB, rawEmail: string, mail: Mailer = sendEmail) {
   const email = normaliseEmail(rawEmail);
