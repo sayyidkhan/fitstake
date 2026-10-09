@@ -551,7 +551,7 @@ export default function App() {
 }
 
 function Shell({ children, page }: { children: React.ReactNode; page: "home" | "how" }) {
-  const [mode, setMode] = useState("Sandbox experience");
+  const [mode, setMode] = useState("Checking…");
   useEffect(() => {
     api
       .config()
@@ -570,8 +570,7 @@ function Shell({ children, page }: { children: React.ReactNode; page: "home" | "
     <div className="app-shell">
       <nav className="topbar">
         <a className="brand" href="/" aria-label="FitStake home">
-          <span className="brand-mark">↗</span>fitstake
-          <span className="brand-dot">.</span>
+          FitStake<span className="brand-dot">.</span>
         </a>
         <nav className="topnav" aria-label="Main">
           <a href="#" aria-current={page === "home" ? "page" : undefined}>
@@ -795,6 +794,21 @@ function Start({
             {error && (
               <p role="alert" className="error-banner">
                 {error}
+              </p>
+            )}
+            {!busy && (
+              <p className="field-hint" role="status">
+                {!name.trim() || !email.trim()
+                  ? "Add your name and email to continue."
+                  : !ok
+                    ? "Enter a valid email address."
+                    : mode === "create" && !daysOk
+                      ? "Choose a length from 1 to 365 days."
+                      : mode === "join" && code.trim().length < 4
+                        ? "Enter your friend’s invite code."
+                        : !agreed
+                          ? "Tick the box to agree to the scoring rules."
+                          : ""}
               </p>
             )}
             <button
