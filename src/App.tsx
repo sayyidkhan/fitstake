@@ -981,38 +981,20 @@ function Start({
             See how it works
           </a>
         </p>
-        <figure className="reward-preview">
-          <div className="reward-art" aria-hidden="true">
-            <svg viewBox="0 0 180 150">
-              <path
-                d="M42 30h96l-5 26 17 69-54 6-7-50-6 50-53-6 17-69z"
-                fill="#273c36"
-              />
-              <path d="M44 31h92v12H44z" fill="#142c24" />
-              <path
-                d="M88 43v38M51 57l-9 60M126 57l13 60"
-                stroke="#70847a"
-                strokeWidth="2"
-              />
-              <path
-                d="M85 40l-4 26m10-26 6 26"
-                stroke="#e6e4c4"
-                strokeWidth="2"
-              />
-            </svg>
-          </div>
-          <figcaption>
-            <h3>Your next win looks good.</h3>
-            <p>KYDRA Axis Linerless Shorts</p>
-            <span className="reward-price num">
-              S$58.00 <small>· Best reward</small>
-            </span>
-          </figcaption>
-        </figure>
-        <p className="catalog-note">
-          Illustrative reward. Final availability and price are checked at
-          checkout.
-        </p>
+        <div className="cta-video-wrap">
+          <p className="meta">WATCH THE PITCH</p>
+          <video
+            className="cta-video"
+            src="/videos/fitstake-cta.mp4"
+            poster="/videos/fitstake-cta-poster.jpg"
+            playsInline
+            muted
+            loop
+            autoPlay
+            controls
+            aria-label="FitStake CTA video"
+          />
+        </div>
       </section>
       <section className="onboarding panel" aria-labelledby="onboarding-title">
         {!me ? (

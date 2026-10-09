@@ -42,6 +42,11 @@
   accent-color: var(--accent-ink);
   caret-color: var(--accent-ink);
 }
+html,
+body {
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -412,6 +417,11 @@ footer {
   gap: clamp(40px, 7vw, 96px);
   align-items: start;
 }
+
+.landing-grid > * {
+  min-width: 0;
+}
+
 .hero {
   padding-top: clamp(0px, 3vw, 32px);
 }
@@ -442,38 +452,24 @@ footer {
   font-size: 14px;
   color: var(--ink-2);
 }
-.reward-preview {
-  display: flex;
-  align-items: center;
-  gap: 20px;
+.cta-video-wrap {
+  margin-top: clamp(24px, 3vw, 36px);
+}
+
+.cta-video-wrap .meta {
+  margin-bottom: 10px;
+}
+
+.cta-video {
+  display: block;
+  width: 100%;
+  max-width: min(280px, 100%);
+  aspect-ratio: 9 / 16;
+  border-radius: 26px;
+  object-fit: cover;
   background: var(--surface-2);
-  border-radius: var(--radius);
-  padding: 16px 24px 16px 16px;
-  margin: 0;
-  max-width: 520px;
-}
-.reward-art {
-  width: 112px;
-  flex-shrink: 0;
-}
-.reward-preview h3 {
-  font-size: 17px;
-  font-weight: 650;
-  margin: 0 0 4px;
-}
-.reward-preview p {
-  font-size: 14px;
-  color: var(--ink-2);
-  margin: 0 0 8px;
-}
-.reward-price {
-  font-size: 15px;
-  font-weight: 650;
-}
-.reward-price small {
-  font-size: 13px;
-  font-weight: 400;
-  color: var(--ink-3);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-card);
 }
 .onboarding {
   padding: var(--pad-panel);
@@ -1273,9 +1269,6 @@ footer {
   }
   .field-pair {
     grid-template-columns: 1fr;
-  }
-  .reward-art {
-    width: 84px;
   }
   .dash-actions {
     width: 100%;
