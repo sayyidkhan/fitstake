@@ -132,7 +132,7 @@ export const api = {
   joinLobby: (id: string) =>
     call<{ challengeId: string; userId: string }>(`/lobby/${id}/join`, {}),
   config: () =>
-    call<{ payments: "simulated" | "reap_sandbox" | "unavailable" }>("/config"),
+    call<{ payments: "simulated" | "reap_sandbox" | "unavailable"; auth: "demo" | "email" }>("/config"),
   create: (name: string, durationDays: number, activity: string, isPublic: boolean) =>
     call<{ challengeId: string; userId: string; inviteCode: string }>(
       "/challenges",

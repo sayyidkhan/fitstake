@@ -205,3 +205,34 @@ describe("access control", () => {
     expect(ok.status).toBe(201);
   });
 });
+
+describe("demo mode on Vercel", () => {
+  it("works with just AUTH_DEV_CODE=true (no AUTH_SECRET, no email), and /config says so", async () => {
+    process.env.VERCEL = "1";
+    process.env.AUTH_DEV_CODE = "true";
+    delete process.env.AUTH_SECRET;
+    try {
+      expect((await json(await call("/config"))).auth).toBe("demo");
+      const email = uniq("demo");
+      const { devCode } = await json(await call("/auth/request-code", { body: { email } }));
+      expect(devCode).toMatch(/^\d{6}$/);
+      const res = await call("/auth/verify", { body: { email, code: devCode, name: "Demo Dana", acceptedTerms: true } });
+      expect(res.status).toBe(200);
+      expect(res.headers.get("set-cookie")).toMatch(/Secure/i); // Vercel => secure cookie
+      expect((await call("/auth/me", { cookie: cookieOf(res) })).status).toBe(200);
+    } finally {
+      delete process.env.VERCEL;
+      delete process.env.AUTH_DEV_CODE;
+    }
+  });
+
+  it("without demo mode or email, config says email and login stays closed", async () => {
+    process.env.VERCEL = "1";
+    try {
+      expect((await json(await call("/config"))).auth).toBe("email");
+      expect((await call("/auth/request-code", { body: { email: uniq("closed") } })).status).toBe(503);
+    } finally {
+      delete process.env.VERCEL;
+    }
+  });
+});

@@ -272,6 +272,7 @@ function AppInner() {
   const session: Session | null = account && challengeId ? { challengeId, userId: account.id } : null;
   const [state, setState] = useState<State | null>(null);
   const [error, setError] = useState("");
+  const [joinedName, setJoinedName] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [page, setPage] = useState<Page>(pageFromHash);
@@ -315,6 +316,7 @@ function AppInner() {
     }
     setChallengeId(null);
     setState(null);
+    setJoinedName(null);
   }, []);
   // Logged out (or logged in as someone else): forget the open challenge.
   useEffect(() => {
@@ -375,7 +377,8 @@ function AppInner() {
       <Shell page={page}>
         <Lobby
           me={account}
-          onJoined={(r) => {
+          onJoined={(r, name) => {
+            setJoinedName(name);
             start(r);
             window.location.hash = "";
           }}
@@ -494,6 +497,20 @@ function AppInner() {
 
   return (
     <Shell page={page}>
+      {joinedName && (
+        <p role="status" className="success-banner">
+          <Icon name="check" />
+          <span>
+            You’ve joined <b>{joinedName}</b>.{" "}
+            {challenge.status === "draft"
+              ? "Next: pick your rewards below, then the challenge starts once everyone has."
+              : "Good luck!"}
+          </span>
+          <button type="button" className="text-link" onClick={() => setJoinedName(null)}>
+            Dismiss
+          </button>
+        </p>
+      )}
       <header className="dash-header">
         <div>
           <h1 className="dashboard-title">{challenge.name}</h1>
@@ -1517,7 +1534,7 @@ function Setup({
   );
 }
 
-function Lobby({ me, onJoined }: { me: AuthUser | null | undefined; onJoined: (s: { challengeId: string }) => void }) {
+function Lobby({ me, onJoined }: { me: AuthUser | null | undefined; onJoined: (s: { challengeId: string }, challengeName: string) => void }) {
   const [list, setList] = useState<LobbyEntry[] | null>(null);
   const [activity, setActivity] = useState("");
   const [error, setError] = useState("");
@@ -1547,7 +1564,7 @@ function Lobby({ me, onJoined }: { me: AuthUser | null | undefined; onJoined: (s
     }
     setJoining(c.id);
     try {
-      onJoined(await api.joinLobby(c.id));
+      onJoined(await api.joinLobby(c.id), c.name);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not join");
       refresh();
@@ -1775,6 +1792,10 @@ function AuthCard({ onAuthed }: { onAuthed: (u: AuthUser) => void }) {
   const [busy, setBusy] = useState(false);
   const [wait, setWait] = useState(0);
   const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const [demo, setDemo] = useState(false);
+  useEffect(() => {
+    api.config().then((c) => setDemo(c.auth === "demo")).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (wait <= 0) return;
@@ -1787,7 +1808,22 @@ function AuthCard({ onAuthed }: { onAuthed: (u: AuthUser) => void }) {
     setError("");
     try {
       const r = await api.requestCode(email.trim());
-      setDevCode(r.devCode ?? null);
+      if (r.devCode) {
+        // Demo mode: no email is sent, so sign in straight away with the code the server returned.
+        try {
+          const v = await api.verify({
+            email: email.trim(),
+            code: r.devCode,
+            ...(mode === "signup" ? { name: name.trim(), acceptedTerms: terms } : {}),
+          });
+          onAuthed(v.user);
+          return;
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "Could not sign you in");
+          return;
+        }
+      }
+      setDevCode(null);
       setStep("code");
       setCode("");
       setWait(30);
@@ -1822,7 +1858,11 @@ function AuthCard({ onAuthed }: { onAuthed: (u: AuthUser) => void }) {
       <h2>{mode === "signup" ? "Create your account" : "Welcome back"}</h2>
       <p className="onboarding-lede">
         {step === "email" ? (
-          "No password needed. We’ll email you a 6-digit code."
+          demo ? (
+            "Demo mode: sign in instantly. No email or password needed."
+          ) : (
+            "No password needed. We’ll email you a 6-digit code."
+          )
         ) : (
           <>
             We sent a code to <b>{email.trim()}</b>. It expires in 10 minutes.
@@ -1878,7 +1918,15 @@ function AuthCard({ onAuthed }: { onAuthed: (u: AuthUser) => void }) {
               </p>
             )}
             <button className={btn + " submit-action"} aria-busy={busy} disabled={busy || !emailOk || (mode === "signup" && (!name.trim() || !terms))}>
-              {busy ? "Sending…" : "Email me a code"}
+              {busy
+                ? demo
+                  ? "Signing in…"
+                  : "Sending…"
+                : demo
+                  ? mode === "signup"
+                    ? "Create demo account"
+                    : "Log in"
+                  : "Email me a code"}
               <Icon name="arrow" />
             </button>
           </form>

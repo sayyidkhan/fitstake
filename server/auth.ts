@@ -21,7 +21,8 @@ export const normaliseEmail = (e: string) => e.trim().toLowerCase();
 function secret() {
   const s = process.env.AUTH_SECRET;
   if (s && s.length >= 16) return s;
-  if (process.env.VERCEL) throw new HttpError(503, "Login isn’t configured yet: AUTH_SECRET is missing or too short.");
+  // Demo mode shows the code on screen, so the hashing secret protects nothing there. Real email login must have one.
+  if (process.env.VERCEL && !devCodeAllowed()) throw new HttpError(503, "Login isn’t configured yet: AUTH_SECRET is missing or too short.");
   return "local-dev-secret-not-for-production";
 }
 const hashCode = (email: string, code: string) => sha256(`${secret()}:${email}:${code}`);

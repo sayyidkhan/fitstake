@@ -381,6 +381,21 @@ footer {
   color: var(--ink-3);
   margin: 0;
 }
+.success-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  margin: 0 0 20px;
+  background: #e8f3da;
+  color: var(--accent-ink);
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+}
+.success-banner > span {
+  flex: 1;
+  color: var(--ink);
+}
 .error-banner {
   padding: 12px 14px;
   background: var(--danger-bg);
