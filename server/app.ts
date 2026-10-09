@@ -11,6 +11,8 @@ const person = z.object({
   name: z.string().min(1).max(60),
   email: z.string().email(),
 });
+// Users must accept the Terms and Privacy Notice before a challenge is created or joined.
+const acceptedTerms = z.literal(true);
 const ids = z.object({ userId: z.string().min(1) });
 
 export const app = new Hono().basePath("/api");
@@ -61,6 +63,7 @@ app.post(
     z.object({
       name: z.string().min(1).max(80),
       creator: person,
+      acceptedTerms,
       // Any length from a single day up to a year.
       durationDays: z.number().int().min(1).max(365).default(30),
     }),
@@ -70,9 +73,12 @@ app.post(
 
 app.post(
   "/join",
-  zValidator("json", person.extend({ inviteCode: z.string().min(4).max(16) })),
+  zValidator(
+    "json",
+    person.extend({ inviteCode: z.string().min(4).max(16), acceptedTerms }),
+  ),
   async (c) => {
-    const { inviteCode, ...p } = c.req.valid("json");
+    const { inviteCode, acceptedTerms: _accepted, ...p } = c.req.valid("json");
     return c.json(await svc.joinChallenge(db, inviteCode, p));
   },
 );

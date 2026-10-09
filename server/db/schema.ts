@@ -9,6 +9,9 @@ export const users = sqliteTable("users", {
   id: id(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
+  // Record of the Terms and Privacy Notice version accepted, for PDPA accountability.
+  termsVersion: text("terms_version"),
+  termsAcceptedAt: integer("terms_accepted_at", { mode: "timestamp" }),
   createdAt: createdAt(),
 });
 

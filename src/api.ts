@@ -17,7 +17,7 @@ export type State = {
     loserUserId: string | null;
   };
   participants: {
-    user: { id: string; name: string; email: string };
+    user: { id: string; name: string };
     rewards: Reward[];
     authorised: boolean;
     enrolmentPending: boolean;
@@ -80,12 +80,13 @@ export const api = {
   ) =>
     call<{ challengeId: string; userId: string; inviteCode: string }>(
       "/challenges",
-      { name, creator, durationDays },
+      { name, creator, durationDays, acceptedTerms: true },
     ),
   join: (inviteCode: string, p: { name: string; email: string }) =>
     call<{ challengeId: string; userId: string }>("/join", {
       inviteCode,
       ...p,
+      acceptedTerms: true,
     }),
   state: (id: string) => call<State>(`/challenges/${id}`),
   merchants: () => call<Product[]>("/merchants"),

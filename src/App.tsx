@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, money, type Recommendation, type State } from "./api";
+import { LEGAL, LegalPage, type LegalPageId } from "./legal";
+
+type Page = "home" | "how" | LegalPageId;
+const PAGE_BY_HASH: Record<string, Page> = {
+  "#how-it-works": "how",
+  "#privacy": "privacy",
+  "#terms": "terms",
+  "#data-policy": "data-policy",
+};
+const pageFromHash = (hash: string): Page => PAGE_BY_HASH[hash] ?? "home";
 
 type Session = { challengeId: string; userId: string };
 const KEY = "fitstake.session";
@@ -92,7 +102,7 @@ const DETAILS = [
   },
   {
     you: "Enrol a card on Reap’s secure hosted page and set a spending ceiling.",
-    app: "Stores only your enrolment reference and your ceiling. Card details stay with Reap.",
+    app: "Stores your name, email, enrolment reference and spending ceiling. Card details stay with Reap.",
     note: "No money is held in escrow. Reap’s automatic payment mandates aren’t available yet, so you approve each final-day charge yourself.",
   },
   {
@@ -159,7 +169,7 @@ function HowItWorks({ onStart }: { onStart: () => void }) {
         </details>
         <details>
           <summary>Where are my card details stored?</summary>
-          <p>With the payment provider, Reap. FitStake keeps only your enrolment reference and the spending ceiling you set.</p>
+          <p>With the payment provider, Reap. FitStake keeps your name, email, enrolment reference and the spending ceiling you set. See the <a href="#privacy">Privacy Policy</a> and <a href="#data-policy">Data Policy</a>.</p>
         </details>
         <details>
           <summary>What if the quote is higher than my ceiling?</summary>
@@ -187,12 +197,10 @@ export default function App() {
   const [state, setState] = useState<State | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [page, setPage] = useState<"home" | "how">(
-    window.location.hash === "#how-it-works" ? "how" : "home",
-  );
+  const [page, setPage] = useState<Page>(() => pageFromHash(window.location.hash));
   useEffect(() => {
     const onHash = () => {
-      setPage(window.location.hash === "#how-it-works" ? "how" : "home");
+      setPage(pageFromHash(window.location.hash));
       window.scrollTo(0, 0);
     };
     window.addEventListener("hashchange", onHash);
@@ -221,6 +229,12 @@ export default function App() {
     run(() => api.state(session.challengeId)).then((s) => s && setState(s));
   }, [session, run]);
 
+  if (page === "privacy" || page === "terms" || page === "data-policy")
+    return (
+      <Shell page={page}>
+        <LegalPage id={page} />
+      </Shell>
+    );
   if (page === "how")
     return (
       <Shell page={page}>
@@ -550,7 +564,7 @@ export default function App() {
   );
 }
 
-function Shell({ children, page }: { children: React.ReactNode; page: "home" | "how" }) {
+function Shell({ children, page }: { children: React.ReactNode; page: Page }) {
   const [mode, setMode] = useState("Sandbox experience");
   useEffect(() => {
     api
@@ -591,6 +605,14 @@ function Shell({ children, page }: { children: React.ReactNode; page: "home" | "
       <main className="workspace">{children}</main>
       <footer>
         <span>FITSTAKE · MADE FOR YOUR NEXT PERSONAL BEST</span>
+        <nav className="footer-legal" aria-label="Legal">
+          <a href="#privacy">Privacy Policy</a>
+          <a href="#terms">Terms</a>
+          <a href="#data-policy">Data Policy</a>
+          <span>
+            © {new Date().getFullYear()} {LEGAL.operator}
+          </span>
+        </nav>
         <span>
           Simulated fitness. Sandbox purchases. No real money or deliveries.
         </span>
@@ -787,9 +809,18 @@ function Start({
                 onChange={(e) => setAgreed(e.target.checked)}
               />
               <span>
-                I agree to the scoring rules: active minutes (capped at
-                90 a day) plus a bonus for each active day. Ties use active
-                days, then steps.
+                I agree to the{" "}
+                <a href="#terms" target="_blank" rel="noopener noreferrer">
+                  Terms
+                </a>{" "}
+                and{" "}
+                <a href="#privacy" target="_blank" rel="noopener noreferrer">
+                  Privacy Policy
+                </a>
+                , including the scoring rules: active minutes (capped at 90 a
+                day) plus a bonus for each active day. Ties use active days,
+                then steps. I consent to {LEGAL.operator} collecting and using my
+                name and email to run this challenge.
               </span>
             </label>
             {error && (
@@ -898,6 +929,10 @@ function Setup({
                 Suggest
               </button>
             </div>
+            <small className="field-hint">
+              Don’t include health or medical details. Your text is sent to OpenAI
+              to suggest rewards.
+            </small>
             {rec && (
               <div className="mt-3 text-sm">
                 <div className="recommendation-grid">
@@ -947,6 +982,14 @@ function Setup({
               {simulated
                 ? "Local demo: simulate enrolment without entering a card. Your ceiling caps the final quote, including shipping and tax. No payment provider is contacted."
                 : "Enrol on Reap’s hosted sandbox page. Your ceiling caps the final quote, including shipping and tax. Each final-day charge needs your approval; no funds are held."}
+            </p>
+            <p className="field-hint">
+              To set this up, your name and email are shared with Reap. Card
+              details are entered only on Reap’s page. See the{" "}
+              <a href="#privacy" target="_blank" rel="noopener noreferrer">
+                Privacy Policy
+              </a>
+              .
             </p>
             <label className="flex items-center gap-2">
               S${" "}
