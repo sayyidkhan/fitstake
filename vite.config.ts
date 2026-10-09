@@ -4,5 +4,6 @@ import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  server: { proxy: { "/api": "http://localhost:8787" } },
+  // xfwd forwards the browser's real host so the API's same-origin check works in local dev.
+  server: { proxy: { "/api": { target: "http://localhost:8787", xfwd: true } } },
 });

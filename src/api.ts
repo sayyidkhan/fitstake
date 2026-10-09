@@ -63,7 +63,17 @@ export type Recommendation = {
   source: string;
 };
 
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+  ) {
+    super(message);
+  }
+}
+
 async function call<T>(path: string, body?: unknown): Promise<T> {
+  // Same-origin requests carry the HttpOnly session cookie automatically.
   const res = await fetch(`/api${path}`, {
     method: body === undefined ? "GET" : "POST",
     headers:
@@ -72,13 +82,18 @@ async function call<T>(path: string, body?: unknown): Promise<T> {
   });
   const json = await res.json().catch(() => ({}));
   if (!res.ok)
-    throw new Error(
+    throw new ApiError(
       json.detail
         ? `${json.error}: ${json.detail}`
-        : (json.error ?? "Request failed"),
+        : typeof json.error === "string"
+          ? json.error
+          : (json.error?.issues?.[0]?.message ?? "Request failed"),
+      res.status,
     );
   return json as T;
 }
+
+export type AuthUser = { id: string; name: string; email: string };
 
 export type LobbyEntry = {
   id: string;
@@ -90,53 +105,57 @@ export type LobbyEntry = {
   maxPlayers: number;
 };
 
+export type MyChallenge = {
+  id: string;
+  name: string;
+  status: "draft" | "active" | "settled" | "cancelled";
+  activity: string;
+  durationDays: number;
+  inviteCode: string;
+  players: number;
+};
+
 export const api = {
-  cancel: (id: string, userId: string) =>
-    call<State>(`/challenges/${id}/cancel`, { userId }),
+  // Accounts
+  requestCode: (email: string) =>
+    call<{ ok: true; devCode?: string }>("/auth/request-code", { email }),
+  verify: (p: { email: string; code: string; name?: string; acceptedTerms?: boolean }) =>
+    call<{ user: AuthUser }>("/auth/verify", p),
+  me: () => call<{ user: AuthUser }>("/auth/me"),
+  logout: () => call<{ ok: true }>("/auth/logout", {}),
+  logoutAll: () => call<{ ok: true }>("/auth/logout-all", {}),
+  mine: () => call<MyChallenge[]>("/challenges/mine"),
+
+  // Challenges (the server knows who you are from your session)
   lobby: (activity?: string) =>
     call<LobbyEntry[]>(`/lobby${activity ? `?activity=${encodeURIComponent(activity)}` : ""}`),
-  joinLobby: (id: string, p: { name: string; email: string }) =>
-    call<{ challengeId: string; userId: string }>(`/lobby/${id}/join`, { ...p, acceptedTerms: true }),
+  joinLobby: (id: string) =>
+    call<{ challengeId: string; userId: string }>(`/lobby/${id}/join`, {}),
   config: () =>
     call<{ payments: "simulated" | "reap_sandbox" | "unavailable" }>("/config"),
-  create: (
-    name: string,
-    creator: { name: string; email: string },
-    durationDays: number,
-    activity: string,
-    isPublic: boolean,
-  ) =>
+  create: (name: string, durationDays: number, activity: string, isPublic: boolean) =>
     call<{ challengeId: string; userId: string; inviteCode: string }>(
       "/challenges",
-      { name, creator, durationDays, activity, isPublic, acceptedTerms: true },
+      { name, durationDays, activity, isPublic },
     ),
-  join: (inviteCode: string, p: { name: string; email: string }) =>
-    call<{ challengeId: string; userId: string }>("/join", {
-      inviteCode,
-      ...p,
-      acceptedTerms: true,
-    }),
+  join: (inviteCode: string) =>
+    call<{ challengeId: string; userId: string }>("/join", { inviteCode }),
+  cancel: (id: string) => call<State>(`/challenges/${id}/cancel`, {}),
   state: (id: string) => call<State>(`/challenges/${id}`),
   merchants: () => call<Product[]>("/merchants"),
   recommend: (id: string, preferences: string, budgetCents: number) =>
     call<Recommendation>(`/challenges/${id}/recommend`, { preferences, budgetCents }),
-  lock: (
-    id: string,
-    userId: string,
-    lowestId: string,
-    bestId: string,
-    budgetCents: number,
-  ) =>
-    call<State>(`/challenges/${id}/rewards`, { userId, lowestId, bestId, budgetCents }),
-  updateCeiling: (id: string, userId: string, spendingCeilingCents: number) =>
-    call<State>(`/challenges/${id}/ceiling`, { userId, spendingCeilingCents }),
-  authorize: (id: string, userId: string, spendingCeilingCents: number) =>
+  lock: (id: string, lowestId: string, bestId: string, budgetCents: number) =>
+    call<State>(`/challenges/${id}/rewards`, { lowestId, bestId, budgetCents }),
+  updateCeiling: (id: string, spendingCeilingCents: number) =>
+    call<State>(`/challenges/${id}/ceiling`, { spendingCeilingCents }),
+  authorize: (id: string, spendingCeilingCents: number) =>
     call<{ approvalUrl: string | null; state: State }>(
       `/challenges/${id}/authorize`,
-      { userId, spendingCeilingCents, returnUrl: window.location.origin },
+      { spendingCeilingCents, returnUrl: window.location.origin },
     ),
-  enrollmentStatus: (id: string, userId: string) =>
-    call<State>(`/challenges/${id}/enrollment-status`, { userId }),
+  enrollmentStatus: (id: string) =>
+    call<State>(`/challenges/${id}/enrollment-status`, {}),
   refreshTransactions: (id: string) =>
     call<State>(`/challenges/${id}/refresh-transactions`, {}),
   simulate: (id: string) =>

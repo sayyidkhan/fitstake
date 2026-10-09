@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { api, money, type LobbyEntry, type Product, type Recommendation, type State } from "./api";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { api, ApiError, money, type AuthUser, type MyChallenge, type LobbyEntry, type Product, type Recommendation, type State } from "./api";
 import { priceBand } from "../shared/pricing";
 import {
   ACTIVITIES,
@@ -10,14 +10,42 @@ import {
 import { LEGAL, LegalPage, type LegalPageId } from "./legal";
 
 type Session = { challengeId: string; userId: string };
-const KEY = "fitstake.session";
-const load = (): Session | null => {
+// Only the id of the challenge you last opened is remembered in the browser. Who you are is the HttpOnly session cookie.
+const KEY = "fitstake.challenge";
+const loadChallengeId = (): string | null => {
   try {
-    return JSON.parse(localStorage.getItem(KEY) ?? "null");
+    return localStorage.getItem(KEY);
   } catch {
     return null;
   }
 };
+const RETURN_KEY = "fitstake.returnTo";
+
+type AuthState = { me: AuthUser | null | undefined; setMe: (u: AuthUser | null) => void; logout: (everywhere?: boolean) => Promise<void> };
+const AuthCtx = createContext<AuthState>({ me: undefined, setMe: () => {}, logout: async () => {} });
+const useAuth = () => useContext(AuthCtx);
+
+function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [me, setMe] = useState<AuthUser | null | undefined>(undefined);
+  useEffect(() => {
+    api
+      .me()
+      .then((r) => setMe(r.user))
+      .catch(() => setMe(null));
+  }, []);
+  const logout = async (everywhere = false) => {
+    await (everywhere ? api.logoutAll() : api.logout()).catch(() => {});
+    try {
+      localStorage.removeItem(KEY);
+    } catch {
+      /* ignore */
+    }
+    setMe(null);
+    window.location.hash = "";
+  };
+  return <AuthCtx.Provider value={{ me, setMe, logout }}>{children}</AuthCtx.Provider>;
+}
+
 
 // The six-step product workflow, shown on the landing page and tracked on the dashboard.
 // Day label for each workflow step. Pass the challenge length for exact days; omit it for generic labels.
@@ -186,10 +214,11 @@ function HowItWorks({ onStart }: { onStart: () => void }) {
   );
 }
 
-type Page = "home" | "how" | "lobby" | LegalPageId;
+type Page = "home" | "how" | "lobby" | "login" | LegalPageId;
 const PAGE_BY_HASH: Record<string, Page> = {
   "#how-it-works": "how",
   "#challenges": "lobby",
+  "#login": "login",
   "#privacy": "privacy",
   "#terms": "terms",
   "#data-policy": "data-policy",
@@ -201,7 +230,17 @@ const btn = "action px-4 py-2 font-semibold disabled:opacity-40";
 const input = "field w-full px-3 py-2";
 
 export default function App() {
-  const [session, setSession] = useState<Session | null>(load);
+  return (
+    <AuthProvider>
+      <AppInner />
+    </AuthProvider>
+  );
+}
+
+function AppInner() {
+  const { me: account, setMe } = useAuth();
+  const [challengeId, setChallengeId] = useState<string | null>(loadChallengeId);
+  const session: Session | null = account && challengeId ? { challengeId, userId: account.id } : null;
   const [state, setState] = useState<State | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -221,21 +260,49 @@ export default function App() {
     try {
       return await fn();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
+      if (e instanceof ApiError && e.status === 401) {
+        setMe(null);
+        setError("Your session has ended. Please log in again.");
+      } else setError(e instanceof Error ? e.message : "Something went wrong");
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [setMe]);
 
-  const start = (s: Session) => {
-    localStorage.setItem(KEY, JSON.stringify(s));
-    setSession(s);
+  const start = (s: { challengeId: string }) => {
+    try {
+      localStorage.setItem(KEY, s.challengeId);
+    } catch {
+      /* ignore */
+    }
+    setChallengeId(s.challengeId);
   };
+  const leave = useCallback(() => {
+    try {
+      localStorage.removeItem(KEY);
+    } catch {
+      /* ignore */
+    }
+    setChallengeId(null);
+    setState(null);
+  }, []);
+  // Logged out (or logged in as someone else): forget the open challenge.
+  useEffect(() => {
+    if (account === null) leave();
+  }, [account, leave]);
 
   useEffect(() => {
     if (!session) return;
-    run(() => api.state(session.challengeId)).then((s) => s && setState(s));
-  }, [session, run]);
+    api
+      .state(session.challengeId)
+      .then(setState)
+      .catch((e) => {
+        // Not a member of this challenge any more (or it no longer exists): go back to the start.
+        if (e instanceof ApiError && (e.status === 404 || e.status === 401)) leave();
+        else setError(e instanceof Error ? e.message : "Could not load your challenge");
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.challengeId, session?.userId]);
 
   const waiting = state?.challenge.status === "draft";
   useEffect(() => {
@@ -253,10 +320,30 @@ export default function App() {
         <LegalPage id={page} />
       </Shell>
     );
+  const finishLogin = (u: AuthUser) => {
+    setMe(u);
+    let back = "";
+    try {
+      back = sessionStorage.getItem(RETURN_KEY) ?? "";
+      sessionStorage.removeItem(RETURN_KEY);
+    } catch {
+      /* ignore */
+    }
+    window.location.hash = back;
+  };
+  if (page === "login")
+    return (
+      <Shell page={page}>
+        <div className="auth-page">
+          <AuthCard onAuthed={finishLogin} />
+        </div>
+      </Shell>
+    );
   if (page === "lobby")
     return (
       <Shell page={page}>
         <Lobby
+          me={account}
           onJoined={(r) => {
             start(r);
             window.location.hash = "";
@@ -274,10 +361,16 @@ export default function App() {
         />
       </Shell>
     );
+  if (account === undefined)
+    return (
+      <Shell page={page}>
+        <p role="status" className="text-slate-400">Loading…</p>
+      </Shell>
+    );
   if (!session)
     return (
       <Shell page={page}>
-        <Start onStart={start} run={run} busy={busy} error={error} />
+        <Start me={account} onAuthed={finishLogin} onStart={start} run={run} busy={busy} error={error} />
       </Shell>
     );
   if (!state)
@@ -288,9 +381,7 @@ export default function App() {
           <button
             className={btn + " mt-4"}
             onClick={() => {
-              localStorage.removeItem(KEY);
-              setSession(null);
-              setState(null);
+              leave();
             }}
           >
             Back to start
@@ -313,9 +404,7 @@ export default function App() {
             <button
               className={btn}
               onClick={() => {
-                localStorage.removeItem(KEY);
-                setSession(null);
-                setState(null);
+                leave();
               }}
             >
               Start a new challenge
@@ -323,9 +412,7 @@ export default function App() {
             <button
               className={btn}
               onClick={() => {
-                localStorage.removeItem(KEY);
-                setSession(null);
-                setState(null);
+                leave();
                 window.location.hash = "#challenges";
               }}
             >
@@ -393,7 +480,7 @@ export default function App() {
                         : "Cancel this challenge? It will be removed from the lobby.",
                     )
                   )
-                    apply(api.cancel(challenge.id, session.userId));
+                    apply(api.cancel(challenge.id));
                 }}
               >
                 Cancel challenge
@@ -402,9 +489,7 @@ export default function App() {
           <button
             className="text-sm text-slate-400 underline"
             onClick={() => {
-              localStorage.removeItem(KEY);
-              setSession(null);
-              setState(null);
+              leave();
             }}
           >
             Back to start
@@ -669,6 +754,7 @@ export default function App() {
 }
 
 function Shell({ children, page }: { children: React.ReactNode; page: Page }) {
+  const { me, logout } = useAuth();
   const [mode, setMode] = useState("Checking…");
   useEffect(() => {
     api
@@ -707,9 +793,30 @@ function Shell({ children, page }: { children: React.ReactNode; page: Page }) {
             How it works
           </a>
         </nav>
+        <div className="topbar-right">
+        {me ? (
+          <details className="account-menu">
+            <summary>
+              <span className="avatar-sm" aria-hidden="true">{me.name.slice(0, 1).toUpperCase()}</span>
+              <span className="account-name">{me.name.split(" ")[0]}</span>
+            </summary>
+            <div className="account-pop">
+              <p>
+                <b>{me.name}</b>
+                <small>{me.email}</small>
+              </p>
+              <a href="#">My challenges</a>
+              <button onClick={() => logout()}>Log out</button>
+              <button onClick={() => logout(true)}>Log out of all devices</button>
+            </div>
+          </details>
+        ) : me === null ? (
+          <a className="login-link" href="#login">Log in</a>
+        ) : null}
         <span className="sandbox-pill">
           <i /> {mode}
         </span>
+        </div>
       </nav>
       <main className="workspace">{children}</main>
       <footer>
@@ -731,18 +838,20 @@ function Shell({ children, page }: { children: React.ReactNode; page: Page }) {
 }
 
 function Start({
+  me,
+  onAuthed,
   onStart,
   run,
   busy,
   error,
 }: {
-  onStart: (s: Session) => void;
+  me: AuthUser | null;
+  onAuthed: (u: AuthUser) => void;
+  onStart: (s: { challengeId: string }) => void;
   run: <T>(fn: () => Promise<T>) => Promise<T | undefined>;
   busy: boolean;
   error: string;
 }) {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
   const [title, setTitle] = useState("Our personal best");
   const invited = new URLSearchParams(window.location.search).get("join") ?? "";
   const [code, setCode] = useState(invited.toUpperCase().slice(0, 16));
@@ -753,13 +862,12 @@ function Start({
   const [activity, setActivity] = useState(DEFAULT_ACTIVITY);
   const [isPublic, setIsPublic] = useState(true);
   const daysOk = Number.isInteger(days) && days >= 1 && days <= 365;
-  const ok = name.trim().length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     run(() =>
       mode === "create"
-        ? api.create(title.trim(), { name, email }, days, activity, isPublic)
-        : api.join(code.trim(), { name, email }),
+        ? api.create(title.trim(), days, activity, isPublic)
+        : api.join(code.trim()),
     ).then((r) => r && onStart(r));
   };
   return (
@@ -823,6 +931,10 @@ function Start({
           </p>
         </section>
         <section className="onboarding panel">
+          {!me ? (
+            <AuthCard onAuthed={onAuthed} />
+          ) : (
+            <>
           <div className="card-heading">
             <span className="eyebrow">LET’S MAKE IT HAPPEN</span>
             <span className="step-dot">STEP 1 · DAY 1</span>
@@ -832,7 +944,7 @@ function Start({
             <br />
             starts together.
           </h2>
-          <p>Choose how many days, invite a friend, and agree on the scoring rules.</p>
+          <p>Welcome back, {me?.name.split(" ")[0]}. Choose how many days, invite a friend, and agree on the scoring rules.</p>
           <div className="tabs" role="tablist" aria-label="Challenge action">
             <button
               role="tab"
@@ -850,30 +962,6 @@ function Start({
             </button>
           </div>
           <form onSubmit={submit} className="start-form">
-            <label>
-              Your name
-              <input
-                className={input}
-                placeholder="What should we call you?"
-                autoComplete="name"
-                maxLength={60}
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </label>
-            <label>
-              Email address
-              <input
-                className={input}
-                placeholder="you@example.com"
-                autoComplete="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </label>
             {mode === "create" ? (
               <>
                 <label>
@@ -959,18 +1047,7 @@ function Start({
                 onChange={(e) => setAgreed(e.target.checked)}
               />
               <span>
-                I agree to the{" "}
-                <a href="#terms" target="_blank" rel="noopener noreferrer">
-                  Terms
-                </a>{" "}
-                and{" "}
-                <a href="#privacy" target="_blank" rel="noopener noreferrer">
-                  Privacy Policy
-                </a>
-                , including the scoring rules: active minutes (capped at 90 a
-                day) plus a bonus for each active day. Ties use active days,
-                then steps. I consent to {LEGAL.operator} collecting and using my
-                name and email to run this challenge.
+                I agree to the scoring rules: active minutes (capped at 90 a day) plus a bonus for each active day. Ties use active days, then steps.
               </span>
             </label>
             {error && (
@@ -980,12 +1057,8 @@ function Start({
             )}
             {!busy && (
               <p className="field-hint" role="status">
-                {!name.trim() || !email.trim()
-                  ? "Add your name and email to continue."
-                  : !ok
-                    ? "Enter a valid email address."
-                    : mode === "create" && !daysOk
-                      ? "Choose a length from 1 to 365 days."
+                {mode === "create" && !daysOk
+                  ? "Choose a length from 1 to 365 days."
                       : mode === "join" && code.trim().length < 4
                         ? "Enter your friend’s invite code."
                         : !agreed
@@ -997,7 +1070,6 @@ function Start({
               className={btn + " submit-action"}
               disabled={
                 busy ||
-                !ok ||
                 !agreed ||
                 (mode === "create"
                   ? !title.trim() || !daysOk
@@ -1030,21 +1102,20 @@ function Start({
               days, steps, then a fixed hash. No weight-loss targets.
             </div>
           )}
+            </>
+          )}
         </section>
       </div>
+      {me && <MyChallenges onOpen={onStart} />}
     </>
   );
 }
 
-function Lobby({ onJoined }: { onJoined: (s: Session) => void }) {
+function Lobby({ me, onJoined }: { me: AuthUser | null | undefined; onJoined: (s: { challengeId: string }) => void }) {
   const [list, setList] = useState<LobbyEntry[] | null>(null);
   const [activity, setActivity] = useState("");
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [joining, setJoining] = useState<string | null>(null);
-  const [agreed, setAgreed] = useState(false);
-  const ok = name.trim().length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && agreed;
 
   const refresh = useCallback(() => {
     api
@@ -1062,9 +1133,19 @@ function Lobby({ onJoined }: { onJoined: (s: Session) => void }) {
 
   const join = async (c: LobbyEntry) => {
     setError("");
+    if (!me) {
+      // Joining needs an account: log in, then come back here.
+      try {
+        sessionStorage.setItem(RETURN_KEY, "#challenges");
+      } catch {
+        /* ignore */
+      }
+      window.location.hash = "#login";
+      return;
+    }
     setJoining(c.id);
     try {
-      onJoined(await api.joinLobby(c.id, { name, email }));
+      onJoined(await api.joinLobby(c.id));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not join");
       refresh();
@@ -1083,14 +1164,9 @@ function Lobby({ onJoined }: { onJoined: (s: Session) => void }) {
         list.
       </p>
       <div className={card + " lobby-who"}>
-        <label>
-          Your name
-          <input className={input} value={name} maxLength={60} autoComplete="name" placeholder="What should we call you?" onChange={(e) => setName(e.target.value)} />
-        </label>
-        <label>
-          Email address
-          <input className={input} type="email" value={email} autoComplete="email" placeholder="you@example.com" onChange={(e) => setEmail(e.target.value)} />
-        </label>
+        <p className="lobby-as">
+          {me ? <>Joining as <b>{me.name}</b></> : <>You’ll need a free account to join. <a href="#login" onClick={() => { try { sessionStorage.setItem(RETURN_KEY, "#challenges"); } catch { /* ignore */ } }}>Log in or sign up</a></>}
+        </p>
         <label>
           Activity
           <select className={input} value={activity} onChange={(e) => setActivity(e.target.value)}>
@@ -1105,20 +1181,6 @@ function Lobby({ onJoined }: { onJoined: (s: Session) => void }) {
               </optgroup>
             ))}
           </select>
-        </label>
-        <label className="agree">
-          <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
-          <span>
-            I agree to the{" "}
-            <a href="#terms" target="_blank" rel="noopener noreferrer">
-              Terms
-            </a>{" "}
-            and{" "}
-            <a href="#privacy" target="_blank" rel="noopener noreferrer">
-              Privacy Policy
-            </a>
-            . I consent to {LEGAL.operator} collecting and using my name and email to join.
-          </span>
         </label>
       </div>
       {error && (
@@ -1158,14 +1220,13 @@ function Lobby({ onJoined }: { onJoined: (s: Session) => void }) {
               <span className="lobby-seats">
                 {c.players}/{c.maxPlayers} players
               </span>
-              <button className={btn} disabled={!ok || joining !== null} onClick={() => join(c)} title={ok ? undefined : "Enter your name and email first"}>
-                {joining === c.id ? "Joining…" : "Join"}
+              <button className={btn} disabled={joining !== null} onClick={() => join(c)}>
+                {joining === c.id ? "Joining…" : me ? "Join" : "Log in to join"}
               </button>
             </li>
           );
         })}
       </ul>
-      {!ok && list && list.length > 0 && <p className="field-hint">Add your name and email, and accept the terms above, to join.</p>}
     </section>
   );
 }
@@ -1226,6 +1287,192 @@ function ProductImage({
         )}
       </svg>
     </span>
+  );
+}
+
+// Passwordless sign-in: we email a 6-digit code. New people also give a name and accept the Terms.
+function AuthCard({ onAuthed }: { onAuthed: (u: AuthUser) => void }) {
+  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [step, setStep] = useState<"email" | "code">("email");
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [terms, setTerms] = useState(false);
+  const [code, setCode] = useState("");
+  const [devCode, setDevCode] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [wait, setWait] = useState(0);
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+
+  useEffect(() => {
+    if (wait <= 0) return;
+    const t = setTimeout(() => setWait(wait - 1), 1000);
+    return () => clearTimeout(t);
+  }, [wait]);
+
+  const send = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const r = await api.requestCode(email.trim());
+      setDevCode(r.devCode ?? null);
+      setStep("code");
+      setCode("");
+      setWait(30);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not send the code");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const verify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const r = await api.verify({
+        email: email.trim(),
+        code,
+        ...(mode === "signup" ? { name: name.trim(), acceptedTerms: terms } : {}),
+      });
+      onAuthed(r.user);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not verify the code");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="auth-card">
+      <p className="eyebrow">YOUR ACCOUNT</p>
+      <h2>{mode === "signup" ? "Create your account" : "Welcome back"}</h2>
+      <p className="auth-sub">
+        {step === "email"
+          ? "No password needed. We’ll email you a 6-digit code."
+          : <>We sent a code to <b>{email.trim()}</b>. It expires in 10 minutes.</>}
+      </p>
+      {step === "email" ? (
+        <>
+          <div className="tabs" role="tablist" aria-label="Log in or sign up">
+            <button role="tab" aria-selected={mode === "login"} onClick={() => setMode("login")}>Log in</button>
+            <button role="tab" aria-selected={mode === "signup"} onClick={() => setMode("signup")}>Sign up</button>
+          </div>
+          <form
+            className="start-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              send();
+            }}
+          >
+            {mode === "signup" && (
+              <label>
+                Your name
+                <input className={input} value={name} maxLength={60} autoComplete="name" required placeholder="What should we call you?" onChange={(e) => setName(e.target.value)} />
+              </label>
+            )}
+            <label>
+              Email address
+              <input className={input} type="email" value={email} autoComplete="email" required placeholder="you@example.com" onChange={(e) => setEmail(e.target.value)} />
+            </label>
+            {mode === "signup" && (
+              <label className="agree">
+                <input type="checkbox" checked={terms} onChange={(e) => setTerms(e.target.checked)} />
+                <span>
+                  I agree to the{" "}
+                  <a href="#terms" target="_blank" rel="noopener noreferrer">Terms</a> and{" "}
+                  <a href="#privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>. I consent to{" "}
+                  {LEGAL.operator} collecting and using my name and email to run my account and challenges.
+                </span>
+              </label>
+            )}
+            {error && <p role="alert" className="error-banner">{error}</p>}
+            <button className={btn + " submit-action"} disabled={busy || !emailOk || (mode === "signup" && (!name.trim() || !terms))}>
+              {busy ? "Sending…" : "Email me a code"}
+              <span>→</span>
+            </button>
+          </form>
+        </>
+      ) : (
+        <form className="start-form" onSubmit={verify}>
+          {devCode && (
+            <p className="setup-note" role="status">
+              Demo mode: email sending isn’t set up, so your code is shown here:{" "}
+              <button type="button" className="code-fill" onClick={() => setCode(devCode)}>
+                <b>{devCode}</b> (tap to fill)
+              </button>
+            </p>
+          )}
+          <label>
+            6-digit code
+            <input
+              className={input + " code-input"}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              pattern="\d{6}"
+              maxLength={6}
+              required
+              autoFocus
+              value={code}
+              placeholder="123456"
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+            />
+          </label>
+          {error && <p role="alert" className="error-banner">{error}</p>}
+          <button className={btn + " submit-action"} disabled={busy || code.length !== 6}>
+            {busy ? "Checking…" : mode === "signup" ? "Create my account" : "Log in"}
+            <span>→</span>
+          </button>
+          <div className="auth-links">
+            <button type="button" className="text-link" disabled={wait > 0 || busy} onClick={send}>
+              {wait > 0 ? `Resend code in ${wait}s` : "Resend code"}
+            </button>
+            <button type="button" className="text-link" onClick={() => { setStep("email"); setError(""); setDevCode(null); }}>
+              Use a different email
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
+
+// Everything you've created or joined, so you can pick up where you left off on any device.
+function MyChallenges({ onOpen }: { onOpen: (s: { challengeId: string }) => void }) {
+  const [list, setList] = useState<MyChallenge[] | null>(null);
+  useEffect(() => {
+    api.mine().then(setList).catch(() => setList([]));
+  }, []);
+  if (!list || list.length === 0) return null;
+  const statusLabel: Record<MyChallenge["status"], string> = {
+    draft: "Setting up",
+    active: "In progress",
+    settled: "Finished",
+    cancelled: "Cancelled",
+  };
+  return (
+    <section className="my-challenges" aria-labelledby="mine-title">
+      <h2 id="mine-title">Your challenges</h2>
+      <ul>
+        {list.map((c) => {
+          const a = getActivity(c.activity);
+          return (
+            <li key={c.id} className={card + " mine-row"}>
+              <span className="lobby-icon" aria-hidden="true">{a.icon}</span>
+              <div>
+                <h3>{c.name}</h3>
+                <p>
+                  {a.label} · {c.durationDays} {c.durationDays === 1 ? "day" : "days"} · {c.players}/2 players
+                </p>
+              </div>
+              <span className={"status-chip status-" + c.status}>{statusLabel[c.status]}</span>
+              <button className={btn} onClick={() => onOpen({ challengeId: c.id })}>Open</button>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 
@@ -1484,7 +1731,7 @@ function Setup({
                   className={btn + " mt-3"}
                   disabled={busy || pickTooPricey || staleRec || pickLow.priceCents >= pickBest.priceCents}
                   onClick={() =>
-                    apply(api.lock(challengeId, userId, pickLow.id, pickBest.id, capCents))
+                    apply(api.lock(challengeId, pickLow.id, pickBest.id, capCents))
                   }
                 >
                   Lock in rewards
@@ -1546,7 +1793,7 @@ function Setup({
                   onClick={() => {
                     apply(
                       api
-                        .authorize(challengeId, userId, capCents)
+                        .authorize(challengeId, capCents)
                         .then((r) => {
                           setApprovalUrl(r.approvalUrl);
                           return r.state;
@@ -1564,7 +1811,7 @@ function Setup({
                   <button
                     className={btn}
                     disabled={busy}
-                    onClick={() => apply(api.updateCeiling(challengeId, userId, capCents))}
+                    onClick={() => apply(api.updateCeiling(challengeId, capCents))}
                   >
                     Update my cap to S${cap}
                   </button>
@@ -1584,7 +1831,7 @@ function Setup({
                   className={btn}
                   disabled={busy}
                   onClick={() =>
-                    apply(api.enrollmentStatus(challengeId, userId))
+                    apply(api.enrollmentStatus(challengeId))
                   }
                 >
                   I've finished — check status
