@@ -741,7 +741,6 @@ export function LegalPage({ id }: { id: LegalPageId }) {
   const doc = LEGAL_PAGES[id];
   return (
     <article className="legal">
-      <p className="eyebrow">LEGAL</p>
       <h1>{doc.title}</h1>
       <p className="legal-updated">Last updated {LEGAL.lastUpdated}</p>
       <div className="legal-intro">{doc.intro}</div>
