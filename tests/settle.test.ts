@@ -63,3 +63,25 @@ describe("challenge lifecycle", () => {
     expect(schema).toBeDefined();
   });
 });
+
+describe("challenge length", () => {
+  it("supports a single-day challenge end to end", async () => {
+    const a = await svc.createChallenge(db, { name: "1d", durationDays: 1, creator: { name: "A", email: `a${crypto.randomUUID()}@x.io` } });
+    const b = await svc.joinChallenge(db, a.inviteCode, { name: "B", email: `b${crypto.randomUUID()}@x.io` });
+    for (const u of [a.userId, b.userId]) {
+      await svc.lockRewards(db, a.challengeId, u, "sixeleven-cococoast-500ml", "kydra-axis-linerless-shorts-navy-m");
+      await svc.authorize(db, a.challengeId, u, 10_000, "http://localhost");
+    }
+    await svc.simulateActivity(db, a.challengeId);
+    const s0 = await svc.getState(db, a.challengeId);
+    expect(s0.challenge.durationDays).toBe(1);
+    expect(s0.leaderboard.every((l) => l.adherentDays <= 1)).toBe(true);
+    await svc.settle(db, a.challengeId);
+    expect((await svc.getState(db, a.challengeId)).transactions).toHaveLength(2);
+  });
+
+  it("defaults to 30 days", async () => {
+    const a = await svc.createChallenge(db, { name: "d", creator: { name: "A", email: `a${crypto.randomUUID()}@x.io` } });
+    expect((await svc.getState(db, a.challengeId)).challenge.durationDays).toBe(30);
+  });
+});

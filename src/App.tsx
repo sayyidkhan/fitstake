@@ -12,13 +12,26 @@ const load = (): Session | null => {
 };
 
 // The six-step product workflow, shown on the landing page and tracked on the dashboard.
+// Day label for each workflow step. Pass the challenge length for exact days; omit it for generic labels.
+function stepDay(i: number, days?: number): string {
+  if (i === 0) return "DAY 1";
+  if (i === 3) {
+    if (days === undefined) return "THE DAYS IN BETWEEN";
+    if (days <= 1) return "DAY 1";
+    if (days === 2) return "DAYS 1–2";
+    return days === 3 ? "DAY 2" : `DAYS 2–${days - 1}`;
+  }
+  if (i === 4) return days === undefined ? "FINAL DAY" : `DAY ${days}`;
+  return "";
+}
+
 const WORKFLOW = [
-  { day: "DAY 1", title: "Create a challenge", short: "Create", copy: "Choose 30 days, invite friends, and agree on scoring rules" },
-  { day: "", title: "AI recommends rewards", short: "Rewards", copy: "Each friend locks in their lowest reward and best reward" },
-  { day: "", title: "Pre-authorise payment", short: "Authorise", icon: "shield", copy: "Each friend registers a card and approves spending rules through Reap" },
-  { day: "DAYS 2–29", title: "Compete and improve", short: "Compete", copy: "Track healthy progress, complete personal goals and climb the leaderboard" },
-  { day: "DAY 30", title: "AI determines the results", short: "Results", copy: "The winner unlocks their best reward; the loser unlocks their lowest reward" },
-  { day: "", title: "Agentic payment", short: "Payment", icon: "card", copy: "AI quotes and initiates both reward purchases using Reap" },
+  { title: "Create a challenge", short: "Create", copy: "Choose how many days, invite friends, and agree on scoring rules" },
+  { title: "AI recommends rewards", short: "Rewards", copy: "Each friend locks in their lowest reward and best reward" },
+  { title: "Pre-authorise payment", short: "Authorise", icon: "shield", copy: "Each friend registers a card and approves spending rules through Reap" },
+  { title: "Compete and improve", short: "Compete", copy: "Track healthy progress, complete personal goals and climb the leaderboard" },
+  { title: "AI determines the results", short: "Results", copy: "The winner unlocks their best reward; the loser unlocks their lowest reward" },
+  { title: "Agentic payment", short: "Payment", icon: "card", copy: "AI quotes and initiates both reward purchases using Reap" },
 ] as const;
 
 function Icon({ name }: { name: "shield" | "card" }) {
@@ -39,14 +52,16 @@ function Icon({ name }: { name: "shield" | "card" }) {
   );
 }
 
-function Workflow() {
+function Workflow({ days }: { days?: number }) {
   return (
     <section className="workflow-section" aria-labelledby="workflow-title">
       <h2 id="workflow-title">The end-to-end workflow</h2>
       <ol className="workflow">
         {WORKFLOW.map((step, i) => (
           <li key={step.title}>
-            {step.day && <span className="wf-day">{step.day}</span>}
+            {stepDay(i, days) && (
+              <span className="wf-day">{stepDay(i, days)}</span>
+            )}
             {"icon" in step && <Icon name={step.icon} />}
             <h3>
               {i + 1}. {step.title}
@@ -64,6 +79,105 @@ function Workflow() {
   );
 }
 
+const DETAILS = [
+  {
+    you: "Name the challenge, invite one friend with a code, and both of you agree to the scoring rules.",
+    app: "Sets the challenge window you chose (from a single day up to a year) and shows the same scoring rules to both players. The rules are fixed from the start.",
+    note: "Scoring rewards consistency: active minutes (capped at 90 a day) plus a bonus for every day with 30+ minutes. There are no weight-loss targets.",
+  },
+  {
+    you: "Optionally say what you like, then lock in one lowest-value reward and one best-value reward.",
+    app: "AI suggests from the supported merchant catalogue only (currently Six Eleven and Kydra) and explains its picks. It never invents products.",
+    note: "Rewards are locked once chosen, so nobody can change them after seeing the leaderboard.",
+  },
+  {
+    you: "Enrol a card on Reap’s secure hosted page and set a spending ceiling.",
+    app: "Stores only your enrolment reference and your ceiling. Card details stay with Reap.",
+    note: "No money is held in escrow. Reap’s automatic payment mandates aren’t available yet, so you approve each final-day charge yourself.",
+  },
+  {
+    you: "Stay active, log or connect your activity, and follow the leaderboard.",
+    app: "Scores each day with the agreed rules and keeps the leaderboard up to date. In this demo, activity is simulated.",
+    note: "Healthy progress wins: daily minutes are capped so extreme effort doesn’t help.",
+  },
+  {
+    you: "Nothing. Results appear when the challenge closes.",
+    app: "Applies the locked rules to name a winner and a loser. Ties go to more active days, then more steps, then a fixed tie-break. The winner unlocks their best reward; the loser unlocks their lowest.",
+    note: "The result is deterministic and reproducible. AI explains it but never decides it.",
+  },
+  {
+    you: "Approve your charge on Reap’s hosted page.",
+    app: "Checks availability, gets a fresh quote, confirms it is within your ceiling, then opens a separate checkout for each purchase. The loser buys the winner’s best reward; the winner buys the loser’s lowest.",
+    note: "Each purchase is its own transaction and can’t be duplicated. Sandbox only: no real money moves and nothing ships.",
+  },
+] as const;
+
+function HowItWorks({ onStart }: { onStart: () => void }) {
+  return (
+    <>
+      <section className="hiw-hero">
+        <p className="eyebrow">HOW IT WORKS</p>
+        <h1>Day 1: Commit. Final day: Settle.</h1>
+        <p className="hero-copy">
+          Two friends compete for as many days as they choose (from a single day) on healthy, consistency-first goals.
+          The loser buys the winner’s best reward; the winner buys the loser’s
+          lowest. Everyone gets something, and better progress unlocks the
+          better prize.
+        </p>
+        <button className={btn} onClick={onStart}>
+          Start a challenge <span>→</span>
+        </button>
+      </section>
+      <Workflow />
+      <section className="hiw-steps" aria-labelledby="hiw-steps-title">
+        <h2 id="hiw-steps-title">Step by step</h2>
+        {WORKFLOW.map((step, i) => (
+          <article key={step.title} className="hiw-step">
+            <div className="hiw-badge">{i + 1}</div>
+            <div>
+              {stepDay(i, undefined) && (
+                <span className="hiw-day">{stepDay(i, undefined)}</span>
+              )}
+              <h3>{step.title}</h3>
+              <dl>
+                <dt>What you do</dt>
+                <dd>{DETAILS[i]!.you}</dd>
+                <dt>What FitStake does</dt>
+                <dd>{DETAILS[i]!.app}</dd>
+                <dt>Good to know</dt>
+                <dd>{DETAILS[i]!.note}</dd>
+              </dl>
+            </div>
+          </article>
+        ))}
+      </section>
+      <section className="hiw-faq" aria-labelledby="hiw-faq-title">
+        <h2 id="hiw-faq-title">Questions, answered</h2>
+        <details>
+          <summary>Is my money held anywhere?</summary>
+          <p>No. FitStake doesn’t hold funds or run an escrow. Money only moves when you approve a purchase on the final day, and in this demo nothing real is charged.</p>
+        </details>
+        <details>
+          <summary>Where are my card details stored?</summary>
+          <p>With the payment provider, Reap. FitStake keeps only your enrolment reference and the spending ceiling you set.</p>
+        </details>
+        <details>
+          <summary>What if the quote is higher than my ceiling?</summary>
+          <p>The purchase is stopped and marked failed with the reason. Nothing is charged, and you can retry once it is resolved.</p>
+        </details>
+        <details>
+          <summary>Who decides the winner?</summary>
+          <p>The scoring rules everyone agreed on Day 1. They are deterministic, so the same activity always gives the same result.</p>
+        </details>
+        <details>
+          <summary>Is this real?</summary>
+          <p>It is a proof of concept. Fitness data is simulated and purchases run in Reap’s sandbox, so no money moves and nothing ships.</p>
+        </details>
+      </section>
+    </>
+  );
+}
+
 const card = "panel rounded-2xl p-5";
 const btn = "action px-4 py-2 font-semibold disabled:opacity-40";
 const input = "field w-full px-3 py-2";
@@ -73,6 +187,17 @@ export default function App() {
   const [state, setState] = useState<State | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [page, setPage] = useState<"home" | "how">(
+    window.location.hash === "#how-it-works" ? "how" : "home",
+  );
+  useEffect(() => {
+    const onHash = () => {
+      setPage(window.location.hash === "#how-it-works" ? "how" : "home");
+      window.scrollTo(0, 0);
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
 
   const run = useCallback(async <T,>(fn: () => Promise<T>) => {
     setBusy(true);
@@ -96,15 +221,25 @@ export default function App() {
     run(() => api.state(session.challengeId)).then((s) => s && setState(s));
   }, [session, run]);
 
+  if (page === "how")
+    return (
+      <Shell page={page}>
+        <HowItWorks
+          onStart={() => {
+            window.location.hash = "";
+          }}
+        />
+      </Shell>
+    );
   if (!session)
     return (
-      <Shell>
+      <Shell page={page}>
         <Start onStart={start} run={run} busy={busy} error={error} />
       </Shell>
     );
   if (!state)
     return (
-      <Shell>
+      <Shell page={page}>
         <div className="panel p-5">
           <p role="status">{error || "Loading your challenge…"}</p>
           <button
@@ -127,6 +262,7 @@ export default function App() {
   const me = participants.find((p) => p.user.id === session.userId);
   const nameOf = (id: string | null) =>
     participants.find((p) => p.user.id === id)?.user.name ?? "?";
+  const maxPoints = challenge.durationDays * 100; // 90 capped minutes + 10 bonus per day
   // Current workflow step (0-based): 0 create/invite, 1 rewards, 2 authorise, 3 compete, 5 payment.
   const stepIndex: number =
     challenge.status === "settled"
@@ -142,7 +278,7 @@ export default function App() {
             : 1;
 
   return (
-    <Shell>
+    <Shell page={page}>
       <header className="mb-6 flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="eyebrow">YOUR CHALLENGE HQ</p>
@@ -194,7 +330,7 @@ export default function App() {
         <div>
           <span>THE COMMITMENT</span>
           <strong>
-            30 <small>days</small>
+            {challenge.durationDays} <small>{challenge.durationDays === 1 ? "day" : "days"}</small>
           </strong>
         </div>
         <div>
@@ -285,7 +421,7 @@ export default function App() {
 
       {challenge.status !== "draft" && (
         <section className={card + " mb-6"}>
-          <p className="eyebrow">DAYS 2–29</p>
+          <p className="eyebrow">{stepDay(3, challenge.durationDays)}</p>
           <h2 className="mb-3 font-semibold">4. Compete and improve</h2>
           {leaderboard[0] && leaderboard[0].points > 0 ? (
             <ol className="space-y-1">
@@ -301,14 +437,14 @@ export default function App() {
                   <div className="score-track">
                     <span
                       style={{
-                        width: `${Math.min(100, (s.points / 3000) * 100)}%`,
+                        width: `${Math.min(100, (s.points / maxPoints) * 100)}%`,
                       }}
                     />
                   </div>
                   <p>
                     {s.adherentDays} active days ·{" "}
                     {s.totalSteps.toLocaleString()} steps ·{" "}
-                    {Math.round((s.points / 3000) * 100)}% of maximum score
+                    {Math.round((s.points / maxPoints) * 100)}% of maximum score
                   </p>
                 </li>
               ))}
@@ -327,14 +463,14 @@ export default function App() {
                 disabled={busy}
                 onClick={() => apply(api.simulate(challenge.id))}
               >
-                Simulate 30 days of activity
+                Simulate {challenge.durationDays} {challenge.durationDays === 1 ? "day" : "days"} of activity
               </button>
               <button
                 className={btn}
                 disabled={busy || !leaderboard[0]?.points}
                 onClick={() => apply(api.settle(challenge.id))}
               >
-                Simulate Day 30 — settle
+                Simulate Day {challenge.durationDays} — settle
               </button>
             </div>
           )}
@@ -343,7 +479,7 @@ export default function App() {
 
       {challenge.status === "settled" && (
         <section className={card}>
-          <p className="eyebrow">DAY 30</p>
+          <p className="eyebrow">DAY {challenge.durationDays}</p>
           <h2 className="font-semibold">
             5. AI determines the results: {nameOf(challenge.winnerUserId)} wins
           </h2>
@@ -414,7 +550,7 @@ export default function App() {
   );
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
+function Shell({ children, page }: { children: React.ReactNode; page: "home" | "how" }) {
   const [mode, setMode] = useState("Sandbox experience");
   useEffect(() => {
     api
@@ -437,9 +573,17 @@ function Shell({ children }: { children: React.ReactNode }) {
           <span className="brand-mark">↗</span>fitstake
           <span className="brand-dot">.</span>
         </a>
-        <span className="nav-caption">
-          A little competition. A lot of progress.
-        </span>
+        <nav className="topnav" aria-label="Main">
+          <a href="#" aria-current={page === "home" ? "page" : undefined}>
+            Home
+          </a>
+          <a
+            href="#how-it-works"
+            aria-current={page === "how" ? "page" : undefined}
+          >
+            How it works
+          </a>
+        </nav>
         <span className="sandbox-pill">
           <i /> {mode}
         </span>
@@ -468,17 +612,19 @@ function Start({
 }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [title, setTitle] = useState("Our 30-day personal best");
+  const [title, setTitle] = useState("Our personal best");
   const [code, setCode] = useState("");
   const [mode, setMode] = useState<"create" | "join">("create");
   const [rules, setRules] = useState(false);
   const [agreed, setAgreed] = useState(false);
+  const [days, setDays] = useState(30);
+  const daysOk = Number.isInteger(days) && days >= 1 && days <= 365;
   const ok = name.trim().length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     run(() =>
       mode === "create"
-        ? api.create(title.trim(), { name, email })
+        ? api.create(title.trim(), { name, email }, days)
         : api.join(code.trim(), { name, email }),
     ).then((r) => r && onStart(r));
   };
@@ -495,12 +641,15 @@ function Start({
             <em>Better rewards.</em>
           </h1>
           <p className="hero-copy">
-            Turn “we should work out” into a 30-day commitment. Challenge a
+            Turn “we should work out” into a commitment. Challenge a
             friend, build a healthier routine, and make every active day count.
           </p>
           <div className="hero-tags">
-            <span>↗ 30 days of momentum</span>
+            <span>↗ Days of momentum</span>
             <span>◎ 1 friend by your side</span>
+            <a className="text-link" href="#how-it-works">
+              See how it works ↗
+            </a>
           </div>
           <div className="reward-preview">
             <div className="reward-art" aria-hidden="true">
@@ -546,7 +695,7 @@ function Start({
             <br />
             starts together.
           </h2>
-          <p>Choose 30 days, invite a friend, and agree on the scoring rules.</p>
+          <p>Choose how many days, invite a friend, and agree on the scoring rules.</p>
           <div className="tabs" role="tablist" aria-label="Challenge action">
             <button
               role="tab"
@@ -589,16 +738,35 @@ function Start({
               />
             </label>
             {mode === "create" ? (
-              <label>
-                Challenge name
-                <input
-                  className={input}
-                  required
-                  maxLength={80}
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                />
-              </label>
+              <>
+                <label>
+                  Challenge name
+                  <input
+                    className={input}
+                    required
+                    maxLength={80}
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                  />
+                </label>
+                <label>
+                  Challenge length (days)
+                  <input
+                    className={input}
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={365}
+                    step={1}
+                    required
+                    value={Number.isNaN(days) ? "" : days}
+                    onChange={(e) => setDays(e.target.valueAsNumber)}
+                  />
+                  <small className="field-hint">
+                    From 1 to 365 days. Settlement happens on the final day.
+                  </small>
+                </label>
+              </>
             ) : (
               <label>
                 Invite code
@@ -619,7 +787,7 @@ function Start({
                 onChange={(e) => setAgreed(e.target.checked)}
               />
               <span>
-                I agree to the 30-day scoring rules: active minutes (capped at
+                I agree to the scoring rules: active minutes (capped at
                 90 a day) plus a bonus for each active day. Ties use active
                 days, then steps.
               </span>
@@ -635,7 +803,9 @@ function Start({
                 busy ||
                 !ok ||
                 !agreed ||
-                (mode === "create" ? !title.trim() : code.trim().length < 4)
+                (mode === "create"
+                  ? !title.trim() || !daysOk
+                  : code.trim().length < 4)
               }
             >
               {busy
@@ -666,7 +836,6 @@ function Start({
           )}
         </section>
       </div>
-      <Workflow />
     </>
   );
 }
@@ -777,7 +946,7 @@ function Setup({
             <p className="text-slate-400">
               {simulated
                 ? "Local demo: simulate enrolment without entering a card. Your ceiling caps the final quote, including shipping and tax. No payment provider is contacted."
-                : "Enrol on Reap’s hosted sandbox page. Your ceiling caps the final quote, including shipping and tax. Each Day 30 charge needs your approval; no funds are held."}
+                : "Enrol on Reap’s hosted sandbox page. Your ceiling caps the final quote, including shipping and tax. Each final-day charge needs your approval; no funds are held."}
             </p>
             <label className="flex items-center gap-2">
               S${" "}

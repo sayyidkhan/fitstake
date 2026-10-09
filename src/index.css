@@ -689,3 +689,137 @@ footer {
     font-size: 18px;
   }
 }
+
+/* Top navigation + How it works page */
+.topnav {
+  display: flex;
+  gap: 6px;
+}
+.topnav a {
+  font-size: 13px;
+  font-weight: 600;
+  color: #79867b;
+  text-decoration: none;
+  padding: 8px 14px;
+  border-radius: 999px;
+}
+.topnav a:hover {
+  color: #253b32;
+}
+.topnav a[aria-current="page"] {
+  color: #253b32;
+  background: #e5efd3;
+}
+.hiw-hero {
+  max-width: 720px;
+  padding: 60px 0 10px;
+}
+.hiw-hero h1 {
+  font-size: 52px;
+  font-weight: 800;
+  letter-spacing: -2.5px;
+  line-height: 1.05;
+  color: #253b32;
+  margin: 10px 0 18px;
+}
+.hiw-hero .action {
+  margin-top: 22px;
+}
+.hiw-steps {
+  margin-top: 70px;
+}
+.hiw-steps h2,
+.hiw-faq h2 {
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.7px;
+  margin-bottom: 18px;
+}
+.hiw-step {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 20px;
+  background: #fff;
+  border: 1px solid #dfe5d5;
+  border-radius: 18px;
+  padding: 26px;
+  margin-bottom: 16px;
+}
+.hiw-badge {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #d9ef9c;
+  font-weight: 800;
+  color: #253b32;
+}
+.hiw-day {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: #6f8a52;
+  font-weight: 700;
+}
+.hiw-step h3 {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 2px 0 12px;
+  color: #253b32;
+}
+.hiw-step dt {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #85917d;
+  font-weight: 700;
+  margin-top: 12px;
+}
+.hiw-step dd {
+  margin: 4px 0 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #3f554a;
+}
+.hiw-faq {
+  margin-top: 60px;
+  max-width: 760px;
+}
+.hiw-faq details {
+  border-bottom: 1px solid #dfe5d5;
+  padding: 16px 0;
+}
+.hiw-faq summary {
+  cursor: pointer;
+  font-weight: 650;
+  color: #253b32;
+}
+.hiw-faq p {
+  margin: 10px 0 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #5d6c5f;
+}
+@media (max-width: 650px) {
+  .topbar {
+    gap: 8px;
+  }
+  .topnav a {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+  .hiw-hero h1 {
+    font-size: 36px;
+    letter-spacing: -1.5px;
+  }
+  .hiw-step {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 20px;
+  }
+}
+.field-hint {
+  font-size: 11px;
+  font-weight: 400;
+  color: #85917d;
+}

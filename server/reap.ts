@@ -2,8 +2,8 @@ import type { Product } from "./merchants.js";
 import { DEMO_SHIPPING_ADDRESS } from "./demoAddress.js";
 
 // Adapter over Reap Agentic Payments (https://docs.reap.global/agentic-payments/overview).
-// Reap mandates are not live yet, so Day 30 purchases go through the hosted approval flow:
-// Day 1 enrols a card (hosted page, card data never touches us) and Day 30 checkouts return an approval link.
+// Reap mandates are not live yet, so final-day purchases go through the hosted approval flow:
+// Day 1 enrols a card (hosted page, card data never touches us) and final-day checkouts return an approval link.
 // Without REAP_API_KEY a local simulator is used; it moves no money.
 
 export type Enrollment = {

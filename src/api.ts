@@ -11,6 +11,7 @@ export type State = {
     id: string;
     name: string;
     inviteCode: string;
+    durationDays: number;
     status: "draft" | "active" | "settled";
     winnerUserId: string | null;
     loserUserId: string | null;
@@ -72,10 +73,14 @@ async function call<T>(path: string, body?: unknown): Promise<T> {
 export const api = {
   config: () =>
     call<{ payments: "simulated" | "reap_sandbox" | "unavailable" }>("/config"),
-  create: (name: string, creator: { name: string; email: string }) =>
+  create: (
+    name: string,
+    creator: { name: string; email: string },
+    durationDays: number,
+  ) =>
     call<{ challengeId: string; userId: string; inviteCode: string }>(
       "/challenges",
-      { name, creator },
+      { name, creator, durationDays },
     ),
   join: (inviteCode: string, p: { name: string; email: string }) =>
     call<{ challengeId: string; userId: string }>("/join", {

@@ -58,7 +58,12 @@ app.post(
   "/challenges",
   zValidator(
     "json",
-    z.object({ name: z.string().min(1).max(80), creator: person }),
+    z.object({
+      name: z.string().min(1).max(80),
+      creator: person,
+      // Any length from a single day up to a year.
+      durationDays: z.number().int().min(1).max(365).default(30),
+    }),
   ),
   async (c) => c.json(await svc.createChallenge(db, c.req.valid("json")), 201),
 );
@@ -144,7 +149,7 @@ app.post("/challenges/:id/refresh-transactions", async (c) => {
   return c.json(await svc.getState(db, c.req.param("id")));
 });
 
-// POC only: simulated fitness data and the "Simulate Day 30" action.
+// POC only: simulated fitness data and the "simulate final day" action.
 app.post("/challenges/:id/simulate-activity", async (c) => {
   await svc.simulateActivity(db, c.req.param("id"));
   return c.json(await svc.getState(db, c.req.param("id")));

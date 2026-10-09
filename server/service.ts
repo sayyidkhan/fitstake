@@ -21,10 +21,10 @@ async function upsertUser(db: DB, name: string, email: string) {
   return created!;
 }
 
-export async function createChallenge(db: DB, input: { name: string; creator: { name: string; email: string } }) {
+export async function createChallenge(db: DB, input: { name: string; creator: { name: string; email: string }; durationDays?: number }) {
   const user = await upsertUser(db, input.creator.name, input.creator.email);
   const inviteCode = crypto.randomUUID().slice(0, 8).toUpperCase();
-  const [challenge] = await db.insert(t.challenges).values({ name: input.name, inviteCode }).returning();
+  const [challenge] = await db.insert(t.challenges).values({ name: input.name, inviteCode, durationDays: input.durationDays ?? 30 }).returning();
   await db.insert(t.participants).values({ challengeId: challenge!.id, userId: user.id });
   return { challengeId: challenge!.id, userId: user.id, inviteCode };
 }
@@ -263,7 +263,7 @@ async function applyCheckout(db: DB, id: string, res: CheckoutResult, amountCent
     .where(eq(t.transactions.id, id));
 }
 
-// Day 30 checkouts may wait on the payer's hosted approval; sync their status from Reap.
+// Final-day checkouts may wait on the payer's hosted approval; sync their status from Reap.
 export async function refreshTransactions(db: DB, challengeId: string, reap: ReapClient = getReap()) {
   const open = await db
     .select()
