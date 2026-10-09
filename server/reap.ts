@@ -1,5 +1,5 @@
-import type { Product } from "./merchants";
-import { DEMO_SHIPPING_ADDRESS } from "./demoAddress";
+import type { Product } from "./merchants.js";
+import { DEMO_SHIPPING_ADDRESS } from "./demoAddress.js";
 
 // Adapter over Reap Agentic Payments (https://docs.reap.global/agentic-payments/overview).
 // Reap mandates are not live yet, so Day 30 purchases go through the hosted approval flow:

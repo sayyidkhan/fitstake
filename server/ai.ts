@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { CATALOGUE, type Product } from "./merchants";
+import { CATALOGUE, type Product } from "./merchants.js";
 
 export type Recommendation = { lowest: Product; best: Product; reasoning: string; source: "openai" | "fallback" };
 

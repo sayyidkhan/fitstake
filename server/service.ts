@@ -1,9 +1,9 @@
 import { and, eq, inArray } from "drizzle-orm";
-import type { DB } from "./db/client";
-import * as t from "./db/schema";
-import { findProduct } from "./merchants";
-import { getReap, type CheckoutResult, type ReapClient } from "./reap";
-import { decide, rank, scoreUser } from "./scoring";
+import type { DB } from "./db/client.js";
+import * as t from "./db/schema.js";
+import { findProduct } from "./merchants.js";
+import { getReap, type CheckoutResult, type ReapClient } from "./reap.js";
+import { decide, rank, scoreUser } from "./scoring.js";
 
 export class HttpError extends Error {
   constructor(public status: 400 | 404 | 409, message: string) {
