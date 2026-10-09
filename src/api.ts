@@ -2,6 +2,7 @@ export type Reward = {
   id: string;
   userId: string;
   tier: "lowest" | "best";
+  productId?: string;
   merchant: string;
   productName: string;
   priceCents: number;
@@ -48,6 +49,7 @@ export type Product = {
   category: string;
   tier: "lowest" | "best";
   priceCents: number;
+  imageUrl?: string;
 };
 export type Recommendation = {
   lowest: Product;

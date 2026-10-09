@@ -1183,3 +1183,40 @@ footer {
 button.text-red-700 {
   color: #9b3b2f;
 }
+
+/* Product pictures */
+.product-img {
+  display: block;
+  border-radius: 12px;
+  object-fit: cover;
+  background: #e3ebd5;
+}
+.product-art {
+  display: grid;
+  place-items: center;
+}
+.product-art svg {
+  width: 78%;
+  height: 78%;
+}
+.rec-img {
+  width: 100%;
+  height: 160px;
+  margin-bottom: 16px;
+  background: #e0e9d1;
+}
+.rec-img.product-art svg {
+  width: auto;
+  height: 88%;
+}
+.row-img {
+  width: 52px;
+  height: 52px;
+  flex: none;
+  border-radius: 10px;
+}
+@media (max-width: 650px) {
+  .rec-img {
+    height: 130px;
+  }
+}

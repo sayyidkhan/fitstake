@@ -493,9 +493,11 @@ export default function App() {
               {p.rewards.length ? (
                 p.rewards.map((r) => (
                   <li key={r.id} className="reward-row">
-                    <span className="reward-symbol">
-                      {r.tier === "best" ? "◇" : "◉"}
-                    </span>
+                    <ProductImage
+                      id={r.productId}
+                      name={r.productName}
+                      className="row-img"
+                    />
                     <div>
                       <span className="eyebrow">
                         {r.tier === "best" ? "BEST REWARD" : "LITTLE TREAT"} ·{" "}
@@ -1167,6 +1169,65 @@ function Lobby({ onJoined }: { onJoined: (s: Session) => void }) {
   );
 }
 
+// Product picture: a real photo when the catalogue has one, otherwise a built-in illustration.
+function ProductImage({
+  id,
+  name,
+  imageUrl,
+  className = "",
+}: {
+  id?: string;
+  name: string;
+  imageUrl?: string;
+  className?: string;
+}) {
+  const [broken, setBroken] = useState(false);
+  const key = `${id ?? ""} ${name}`.toLowerCase();
+  if (imageUrl && !broken)
+    return (
+      <img
+        className={`product-img ${className}`}
+        src={imageUrl}
+        alt={name}
+        loading="lazy"
+        onError={() => setBroken(true)}
+      />
+    );
+  const shorts = key.includes("shorts");
+  const drink = key.includes("coconut") || key.includes("water");
+  return (
+    <span className={`product-img product-art ${className}`} role="img" aria-label={name}>
+      <svg viewBox="0 0 120 120" aria-hidden="true">
+        {shorts ? (
+          <>
+            <path d="M28 24h64l-4 20 13 56-40 5-5-38-5 38-40-5 13-56z" fill="#25324d" />
+            <path d="M28 24h64v10H28z" fill="#182238" />
+            <path d="M60 34v32M33 46l-7 44M87 46l10 44" stroke="#5b6b8c" strokeWidth="1.6" />
+            <path d="M57 32l-3 20m9-20 5 20" stroke="#e8e6d0" strokeWidth="1.6" strokeLinecap="round" />
+            <path d="M22 100l16 2M82 102l16-2" stroke="#3a4a6e" strokeWidth="1.6" />
+          </>
+        ) : drink ? (
+          <>
+            <path d="M40 22l8-10h24l8 10v8H40z" fill="#c9a77c" />
+            <path d="M38 30h44v78a4 4 0 0 1-4 4H42a4 4 0 0 1-4-4z" fill="#6b4630" />
+            <path d="M38 30h44v10H38z" fill="#8a5d40" />
+            <circle cx="60" cy="68" r="17" fill="#f3e9d6" />
+            <path d="M52 62q8-9 16 0M50 70q10 9 20 0" fill="none" stroke="#6b4630" strokeWidth="2" strokeLinecap="round" />
+            <rect x="46" y="92" width="28" height="4" rx="2" fill="#f3e9d6" opacity="0.8" />
+          </>
+        ) : (
+          <>
+            <rect x="26" y="50" width="68" height="52" rx="6" fill="#7d9a55" />
+            <rect x="22" y="38" width="76" height="16" rx="5" fill="#9bb870" />
+            <path d="M60 38v64" stroke="#e8f0d2" strokeWidth="6" />
+            <path d="M60 38c-12-18-26-8-18 0M60 38c12-18 26-8 18 0" fill="none" stroke="#e8f0d2" strokeWidth="4" strokeLinecap="round" />
+          </>
+        )}
+      </svg>
+    </span>
+  );
+}
+
 function InviteCard({ code, isPublic }: { code: string; isPublic: boolean }) {
   const [copied, setCopied] = useState("");
   const link = `${window.location.origin}/?join=${code}`;
@@ -1299,6 +1360,12 @@ function Setup({
                 <div className="recommendation-grid">
                   {[rec.lowest, rec.best].map((product) => (
                     <article key={product.id}>
+                      <ProductImage
+                        id={product.id}
+                        name={product.name}
+                        imageUrl={product.imageUrl}
+                        className="rec-img"
+                      />
                       <span className="eyebrow">
                         {product.tier === "best"
                           ? "THE BIGGER WIN"
