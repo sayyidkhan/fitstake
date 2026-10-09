@@ -464,7 +464,7 @@ footer {
 }
 .journey {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   border-bottom: 1px solid #dfe5d5;
   margin: 25px 0 10px;
 }
@@ -478,6 +478,13 @@ footer {
   border-color: #89a85a;
   color: #334c29;
   font-weight: 650;
+}
+.journey li.done {
+  color: #5f7a45;
+}
+.journey li.done span {
+  color: #5f7a45;
+  font-weight: 700;
 }
 .journey span {
   font-size: 10px;
@@ -600,5 +607,85 @@ footer {
   }
   .reward-row strong {
     margin-left: 35px;
+  }
+}
+
+/* End-to-end workflow panel (landing page) */
+.workflow-section {
+  margin-top: 65px;
+}
+.workflow-section h2 {
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.7px;
+  margin-bottom: 18px;
+}
+.workflow {
+  background: #101312;
+  color: #f4f5f2;
+  border: 1px solid #2a2f2c;
+  border-radius: 22px;
+  padding: 44px 24px 34px;
+  display: grid;
+  gap: 8px;
+  text-align: center;
+  list-style: none;
+  margin: 0;
+}
+.workflow li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 14px;
+}
+.workflow .wf-day {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: #aeb4af;
+}
+.workflow .wf-icon {
+  width: 22px;
+  height: 22px;
+  color: #f4f5f2;
+}
+.workflow h3 {
+  font-size: 20px;
+  font-weight: 650;
+  margin: 0;
+}
+.workflow p {
+  font-size: 14px;
+  color: #d3d7d4;
+  max-width: 460px;
+  margin: 0;
+}
+.workflow .wf-arrow {
+  margin-top: 18px;
+  color: #aeb4af;
+  font-size: 16px;
+}
+.start-form label.agree {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.6;
+  color: #5d6c5f;
+}
+.agree input {
+  margin-top: 3px;
+  accent-color: #5f7a45;
+}
+@media (max-width: 650px) {
+  .journey {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .workflow {
+    padding: 32px 16px 24px;
+  }
+  .workflow h3 {
+    font-size: 18px;
   }
 }

@@ -11,6 +11,59 @@ const load = (): Session | null => {
   }
 };
 
+// The six-step product workflow, shown on the landing page and tracked on the dashboard.
+const WORKFLOW = [
+  { day: "DAY 1", title: "Create a challenge", short: "Create", copy: "Choose 30 days, invite friends, and agree on scoring rules" },
+  { day: "", title: "AI recommends rewards", short: "Rewards", copy: "Each friend locks in their lowest reward and best reward" },
+  { day: "", title: "Pre-authorise payment", short: "Authorise", icon: "shield", copy: "Each friend registers a card and approves spending rules through Reap" },
+  { day: "DAYS 2–29", title: "Compete and improve", short: "Compete", copy: "Track healthy progress, complete personal goals and climb the leaderboard" },
+  { day: "DAY 30", title: "AI determines the results", short: "Results", copy: "The winner unlocks their best reward; the loser unlocks their lowest reward" },
+  { day: "", title: "Agentic payment", short: "Payment", icon: "card", copy: "AI quotes and initiates both reward purchases using Reap" },
+] as const;
+
+function Icon({ name }: { name: "shield" | "card" }) {
+  return (
+    <svg className="wf-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {name === "shield" ? (
+        <>
+          <path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z" />
+          <path d="M9 12l2 2 4-4" />
+        </>
+      ) : (
+        <>
+          <rect x="3" y="6" width="18" height="12" rx="3" />
+          <path d="M3 10h18M16 14h2" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+function Workflow() {
+  return (
+    <section className="workflow-section" aria-labelledby="workflow-title">
+      <h2 id="workflow-title">The end-to-end workflow</h2>
+      <ol className="workflow">
+        {WORKFLOW.map((step, i) => (
+          <li key={step.title}>
+            {step.day && <span className="wf-day">{step.day}</span>}
+            {"icon" in step && <Icon name={step.icon} />}
+            <h3>
+              {i + 1}. {step.title}
+            </h3>
+            <p>{step.copy}</p>
+            {i < WORKFLOW.length - 1 && (
+              <span className="wf-arrow" aria-hidden="true">
+                ↓
+              </span>
+            )}
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 const card = "panel rounded-2xl p-5";
 const btn = "action px-4 py-2 font-semibold disabled:opacity-40";
 const input = "field w-full px-3 py-2";
@@ -74,6 +127,19 @@ export default function App() {
   const me = participants.find((p) => p.user.id === session.userId);
   const nameOf = (id: string | null) =>
     participants.find((p) => p.user.id === id)?.user.name ?? "?";
+  // Current workflow step (0-based): 0 create/invite, 1 rewards, 2 authorise, 3 compete, 5 payment.
+  const stepIndex: number =
+    challenge.status === "settled"
+      ? transactions.length > 0 && transactions.every((t) => t.status === "completed")
+        ? 6
+        : 5
+      : challenge.status === "active"
+        ? 3
+        : participants.length < 2
+          ? 0
+          : participants.every((p) => p.rewards.length === 2)
+            ? 2
+            : 1;
 
   return (
     <Shell>
@@ -112,29 +178,15 @@ export default function App() {
         </p>
       )}
 
-      <ol className="journey" aria-label="Challenge milestones">
-        {[
-          "Commit together",
-          "Choose rewards",
-          "Build momentum",
-          "Celebrate & settle",
-        ].map((label, i) => (
+      <ol className="journey" aria-label="Challenge workflow">
+        {WORKFLOW.map((step, i) => (
           <li
-            key={label}
-            className={
-              (challenge.status === "settled"
-                ? 3
-                : challenge.status === "active"
-                  ? 2
-                  : participants.length === 2
-                    ? 1
-                    : 0) === i
-                ? "current"
-                : ""
-            }
+            key={step.title}
+            aria-current={i === stepIndex ? "step" : undefined}
+            className={i === stepIndex ? "current" : i < stepIndex ? "done" : ""}
           >
-            <span>0{i + 1}</span>
-            {label}
+            <span>{i < stepIndex ? "✓" : `0${i + 1}`}</span>
+            {step.short}
           </li>
         ))}
       </ol>
@@ -161,13 +213,7 @@ export default function App() {
         <div>
           <span>THE NEXT STEP</span>
           <strong className="next-step">
-            {challenge.status === "draft"
-              ? participants.length < 2
-                ? "Invite your friend"
-                : "Lock in & enrol"
-              : challenge.status === "active"
-                ? "Build momentum"
-                : "Celebrate your progress"}
+            {stepIndex >= 6 ? "All done" : `${stepIndex + 1}. ${WORKFLOW[stepIndex]!.title}`}
           </strong>
         </div>
       </div>
@@ -239,7 +285,8 @@ export default function App() {
 
       {challenge.status !== "draft" && (
         <section className={card + " mb-6"}>
-          <h2 className="mb-3 font-semibold">Leaderboard</h2>
+          <p className="eyebrow">DAYS 2–29</p>
+          <h2 className="mb-3 font-semibold">4. Compete and improve</h2>
           {leaderboard[0] && leaderboard[0].points > 0 ? (
             <ol className="space-y-1">
               {leaderboard.map((s, i) => (
@@ -296,9 +343,14 @@ export default function App() {
 
       {challenge.status === "settled" && (
         <section className={card}>
+          <p className="eyebrow">DAY 30</p>
           <h2 className="font-semibold">
-            Result: {nameOf(challenge.winnerUserId)} wins
+            5. AI determines the results: {nameOf(challenge.winnerUserId)} wins
           </h2>
+          <p className="mt-1 text-xs text-slate-500">
+            Fixed scoring rules pick the winner; AI only explains the result.
+          </p>
+          <h2 className="mt-5 font-semibold">6. Agentic payment</h2>
           <ul className="mt-3 space-y-2 text-sm">
             {transactions.map((t) => (
               <li key={t.id}>
@@ -420,6 +472,7 @@ function Start({
   const [code, setCode] = useState("");
   const [mode, setMode] = useState<"create" | "join">("create");
   const [rules, setRules] = useState(false);
+  const [agreed, setAgreed] = useState(false);
   const ok = name.trim().length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -486,14 +539,14 @@ function Start({
         <section className="onboarding panel">
           <div className="card-heading">
             <span className="eyebrow">LET’S MAKE IT HAPPEN</span>
-            <span className="step-dot">01 / 03</span>
+            <span className="step-dot">STEP 1 · DAY 1</span>
           </div>
           <h2>
             Your next chapter
             <br />
             starts together.
           </h2>
-          <p>Create a challenge or join your friend’s invitation.</p>
+          <p>Choose 30 days, invite a friend, and agree on the scoring rules.</p>
           <div className="tabs" role="tablist" aria-label="Challenge action">
             <button
               role="tab"
@@ -558,6 +611,19 @@ function Start({
                 />
               </label>
             )}
+            <label className="agree">
+              <input
+                type="checkbox"
+                required
+                checked={agreed}
+                onChange={(e) => setAgreed(e.target.checked)}
+              />
+              <span>
+                I agree to the 30-day scoring rules: active minutes (capped at
+                90 a day) plus a bonus for each active day. Ties use active
+                days, then steps.
+              </span>
+            </label>
             {error && (
               <p role="alert" className="error-banner">
                 {error}
@@ -568,6 +634,7 @@ function Start({
               disabled={
                 busy ||
                 !ok ||
+                !agreed ||
                 (mode === "create" ? !title.trim() : code.trim().length < 4)
               }
             >
@@ -599,43 +666,7 @@ function Start({
           )}
         </section>
       </div>
-      <section className="how-section">
-        <div className="section-heading">
-          <h2>Small steps. Shared stakes.</h2>
-          <p>From “let’s do this” to “look what we did.”</p>
-        </div>
-        <div className="how-grid">
-          {[
-            {
-              n: "01",
-              title: "Make a commitment",
-              copy: "Invite your friend and agree to clear, consistency-first rules.",
-              icon: "◎",
-            },
-            {
-              n: "02",
-              title: "Pick your motivation",
-              copy: "Choose a little treat and a bigger win. Lock in rewards and a spending ceiling.",
-              icon: "◇",
-            },
-            {
-              n: "03",
-              title: "Show up. Get rewarded.",
-              copy: "Compare simulated activity. The loser buys the winner’s best reward; the winner buys the loser’s little treat.",
-              icon: "↗",
-            },
-          ].map((step) => (
-            <article key={step.n}>
-              <div className="how-top">
-                <span>{step.n}</span>
-                <b>{step.icon}</b>
-              </div>
-              <h3>{step.title}</h3>
-              <p>{step.copy}</p>
-            </article>
-          ))}
-        </div>
-      </section>
+      <Workflow />
     </>
   );
 }
@@ -669,8 +700,8 @@ function Setup({
   return (
     <section className={card + " mb-6 space-y-5"}>
       <div>
-        <p className="eyebrow">YOUR MOTIVATION, LOCKED IN</p>
-        <h2 className="setup-title">1. Choose your rewards</h2>
+        <p className="eyebrow">DAY 1 · YOUR MOTIVATION, LOCKED IN</p>
+        <h2 className="setup-title">2. AI recommends rewards</h2>
         {locked ? (
           <p className="text-sm text-slate-400">Locked in.</p>
         ) : (
@@ -738,7 +769,7 @@ function Setup({
         )}
       </div>
       <div>
-        <h2 className="setup-title">2. Set your spending ceiling</h2>
+        <h2 className="setup-title">3. Pre-authorise payment</h2>
         {me.authorised ? (
           <p className="text-sm text-slate-400">Sandbox enrolment ready.</p>
         ) : (
