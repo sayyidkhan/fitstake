@@ -9,7 +9,7 @@ npm run db:migrate
 npm run dev            # web :5173, api :8787
 npm test
 ```
-Deploy: import the repo in Vercel, set the env vars from `.env.example`, run `npm run db:migrate` once against Turso.
+Deploy: import the repo in Vercel and set the env vars from `.env.example` (all environments you deploy to, incl. Preview). The build runs `db:migrate` against Turso automatically.
 
 ## Notes
 - `server/reap.ts`: set `REAP_API_KEY` (version defaults to 2025-02-14) for the live Reap sandbox adapter; without them a local simulator runs. Reap mandates are not live yet, so Day 1 = hosted card enrolment and Day 30 = each payer approves their checkout via Reap's hosted page. The live adapter is untested against real Reap responses (amount units and variant resolution are assumptions; pin `variantId` in `server/merchants.ts` for the exact shorts size).

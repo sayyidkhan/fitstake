@@ -280,7 +280,8 @@ export async function refreshTransactions(db: DB, challengeId: string, reap: Rea
 }
 
 function appUrl() {
-  return process.env.APP_URL ?? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:5173");
+  const host = process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL;
+  return process.env.APP_URL ?? (host ? `https://${host}` : "http://localhost:5173");
 }
 
 export async function getState(db: DB, challengeId: string) {
