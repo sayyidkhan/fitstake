@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, money, type Recommendation, type State } from "./api";
+import { api, money, type LobbyEntry, type Recommendation, type State } from "./api";
 import {
   ACTIVITIES,
   ACTIVITY_CATEGORIES,
@@ -184,6 +184,14 @@ function HowItWorks({ onStart }: { onStart: () => void }) {
   );
 }
 
+type Page = "home" | "how" | "lobby";
+const pageFromHash = (): Page =>
+  window.location.hash === "#how-it-works"
+    ? "how"
+    : window.location.hash === "#challenges"
+      ? "lobby"
+      : "home";
+
 const card = "panel rounded-2xl p-5";
 const btn = "action px-4 py-2 font-semibold disabled:opacity-40";
 const input = "field w-full px-3 py-2";
@@ -193,12 +201,10 @@ export default function App() {
   const [state, setState] = useState<State | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [page, setPage] = useState<"home" | "how">(
-    window.location.hash === "#how-it-works" ? "how" : "home",
-  );
+  const [page, setPage] = useState<Page>(pageFromHash);
   useEffect(() => {
     const onHash = () => {
-      setPage(window.location.hash === "#how-it-works" ? "how" : "home");
+      setPage(pageFromHash());
       window.scrollTo(0, 0);
     };
     window.addEventListener("hashchange", onHash);
@@ -227,6 +233,27 @@ export default function App() {
     run(() => api.state(session.challengeId)).then((s) => s && setState(s));
   }, [session, run]);
 
+  const waiting = state?.challenge.status === "draft";
+  useEffect(() => {
+    if (!session || !waiting) return;
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible")
+        api.state(session.challengeId).then(setState).catch(() => {});
+    }, 8000);
+    return () => clearInterval(t);
+  }, [session, waiting]);
+
+  if (page === "lobby")
+    return (
+      <Shell page={page}>
+        <Lobby
+          onJoined={(r) => {
+            start(r);
+            window.location.hash = "";
+          }}
+        />
+      </Shell>
+    );
   if (page === "how")
     return (
       <Shell page={page}>
@@ -366,7 +393,15 @@ export default function App() {
         <div>
           <span>THE NEXT STEP</span>
           <strong className="next-step">
-            {stepIndex >= 6 ? "All done" : `${stepIndex + 1}. ${WORKFLOW[stepIndex]!.title}`}
+            {stepIndex >= 6
+              ? "All done"
+              : stepIndex === 0
+                ? "Invite your friend"
+                : stepIndex === 1
+                  ? "Lock in your rewards"
+                  : stepIndex === 2
+                    ? "Enrol your card"
+                    : `${stepIndex + 1}. ${WORKFLOW[stepIndex]!.title}`}
           </strong>
         </div>
       </div>
@@ -419,15 +454,12 @@ export default function App() {
             </p>
           </div>
         ))}
-        {participants.length < 2 && (
-          <div className={card + " text-slate-400"}>
-            Waiting for your friend. Share code <b>{challenge.inviteCode}</b>.
-          </div>
-        )}
+        {participants.length < 2 && <InviteCard code={challenge.inviteCode} isPublic={challenge.isPublic} />}
       </section>
 
-      {challenge.status === "draft" && me && participants.length === 2 && (
+      {challenge.status === "draft" && me && (
         <Setup
+          waitingForFriend={participants.length < 2}
           me={me}
           challengeId={challenge.id}
           userId={session.userId}
@@ -568,7 +600,7 @@ export default function App() {
   );
 }
 
-function Shell({ children, page }: { children: React.ReactNode; page: "home" | "how" }) {
+function Shell({ children, page }: { children: React.ReactNode; page: Page }) {
   const [mode, setMode] = useState("Checking…");
   useEffect(() => {
     api
@@ -593,6 +625,12 @@ function Shell({ children, page }: { children: React.ReactNode; page: "home" | "
         <nav className="topnav" aria-label="Main">
           <a href="#" aria-current={page === "home" ? "page" : undefined}>
             Home
+          </a>
+          <a
+            href="#challenges"
+            aria-current={page === "lobby" ? "page" : undefined}
+          >
+            Challenges
           </a>
           <a
             href="#how-it-works"
@@ -630,19 +668,21 @@ function Start({
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [title, setTitle] = useState("Our personal best");
-  const [code, setCode] = useState("");
-  const [mode, setMode] = useState<"create" | "join">("create");
+  const invited = new URLSearchParams(window.location.search).get("join") ?? "";
+  const [code, setCode] = useState(invited.toUpperCase().slice(0, 16));
+  const [mode, setMode] = useState<"create" | "join">(invited ? "join" : "create");
   const [rules, setRules] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [days, setDays] = useState(30);
   const [activity, setActivity] = useState(DEFAULT_ACTIVITY);
+  const [isPublic, setIsPublic] = useState(true);
   const daysOk = Number.isInteger(days) && days >= 1 && days <= 365;
   const ok = name.trim().length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     run(() =>
       mode === "create"
-        ? api.create(title.trim(), { name, email }, days, activity)
+        ? api.create(title.trim(), { name, email }, days, activity, isPublic)
         : api.join(code.trim(), { name, email }),
     ).then((r) => r && onStart(r));
   };
@@ -665,6 +705,9 @@ function Start({
           <div className="hero-tags">
             <span>↗ Days of momentum</span>
             <span>◎ 1 friend by your side</span>
+            <a className="text-link" href="#challenges">
+              Browse open challenges ↗
+            </a>
             <a className="text-link" href="#how-it-works">
               See how it works ↗
             </a>
@@ -791,6 +834,17 @@ function Start({
                     minutes, so any activity is fair.
                   </small>
                 </label>
+                <label className="agree">
+                  <input
+                    type="checkbox"
+                    checked={isPublic}
+                    onChange={(e) => setIsPublic(e.target.checked)}
+                  />
+                  <span>
+                    List my challenge in the public lobby so anyone can join.
+                    Untick to keep it invite-only.
+                  </span>
+                </label>
                 <label>
                   Challenge length (days)
                   <input
@@ -897,13 +951,191 @@ function Start({
   );
 }
 
+function Lobby({ onJoined }: { onJoined: (s: Session) => void }) {
+  const [list, setList] = useState<LobbyEntry[] | null>(null);
+  const [activity, setActivity] = useState("");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState("");
+  const [joining, setJoining] = useState<string | null>(null);
+  const ok = name.trim().length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+  const refresh = useCallback(() => {
+    api
+      .lobby(activity || undefined)
+      .then(setList)
+      .catch((e) => setError(e instanceof Error ? e.message : "Could not load challenges"));
+  }, [activity]);
+
+  useEffect(() => {
+    refresh();
+    // Full challenges drop off the list, so keep it fresh while the page is open.
+    const t = setInterval(() => document.visibilityState === "visible" && refresh(), 10000);
+    return () => clearInterval(t);
+  }, [refresh]);
+
+  const join = async (c: LobbyEntry) => {
+    setError("");
+    setJoining(c.id);
+    try {
+      onJoined(await api.joinLobby(c.id, { name, email }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not join");
+      refresh();
+    } finally {
+      setJoining(null);
+    }
+  };
+
+  return (
+    <section className="lobby">
+      <p className="eyebrow">OPEN CHALLENGES</p>
+      <h1>Pick a challenge to join</h1>
+      <p className="hero-copy">
+        Challenges are created by people like you. Choose one that fits your
+        sport and schedule. When both seats are taken it disappears from this
+        list.
+      </p>
+      <div className={card + " lobby-who"}>
+        <label>
+          Your name
+          <input className={input} value={name} maxLength={60} autoComplete="name" placeholder="What should we call you?" onChange={(e) => setName(e.target.value)} />
+        </label>
+        <label>
+          Email address
+          <input className={input} type="email" value={email} autoComplete="email" placeholder="you@example.com" onChange={(e) => setEmail(e.target.value)} />
+        </label>
+        <label>
+          Activity
+          <select className={input} value={activity} onChange={(e) => setActivity(e.target.value)}>
+            <option value="">All activities</option>
+            {ACTIVITY_CATEGORIES.map((cat) => (
+              <optgroup key={cat} label={cat}>
+                {ACTIVITIES.filter((a) => a.category === cat).map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.icon} {a.label}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </label>
+      </div>
+      {error && (
+        <p role="alert" className="error-banner mt-4">
+          {error}
+        </p>
+      )}
+      <div className="lobby-head">
+        <span>{list ? `${list.length} open ${list.length === 1 ? "challenge" : "challenges"}` : "Loading…"}</span>
+        <button className="text-link" onClick={refresh}>
+          Refresh ↻
+        </button>
+      </div>
+      {list && list.length === 0 && (
+        <div className={card + " lobby-empty"}>
+          <h2 className="font-semibold">No open challenges{activity ? " for this activity" : ""} right now</h2>
+          <p className="text-sm text-slate-400">Be the first: create one and others can join whenever they like.</p>
+          <a className={btn + " inline-block"} href="#">
+            Create a challenge →
+          </a>
+        </div>
+      )}
+      <ul className="lobby-list">
+        {list?.map((c) => {
+          const a = getActivity(c.activity);
+          return (
+            <li key={c.id} className={card + " lobby-row"}>
+              <span className="lobby-icon" aria-hidden="true">
+                {a.icon}
+              </span>
+              <div>
+                <h2>{c.name}</h2>
+                <p>
+                  {a.label} · {c.durationDays} {c.durationDays === 1 ? "day" : "days"} · hosted by {c.host}
+                </p>
+              </div>
+              <span className="lobby-seats">
+                {c.players}/{c.maxPlayers} players
+              </span>
+              <button className={btn} disabled={!ok || joining !== null} onClick={() => join(c)} title={ok ? undefined : "Enter your name and email first"}>
+                {joining === c.id ? "Joining…" : "Join"}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      {!ok && list && list.length > 0 && <p className="field-hint">Add your name and email above to join.</p>}
+    </section>
+  );
+}
+
+function InviteCard({ code, isPublic }: { code: string; isPublic: boolean }) {
+  const [copied, setCopied] = useState("");
+  const link = `${window.location.origin}/?join=${code}`;
+  const copy = async (what: "code" | "link") => {
+    try {
+      await navigator.clipboard.writeText(what === "code" ? code : link);
+      setCopied(what);
+      setTimeout(() => setCopied(""), 2000);
+    } catch {
+      window.prompt("Copy this:", what === "code" ? code : link);
+    }
+  };
+  return (
+    <div className={card + " invite-card"}>
+      <p className="eyebrow">STEP 1 · INVITE YOUR FRIEND</p>
+      <h2 className="font-semibold">Send your friend this invite</h2>
+      <p className="text-sm text-slate-400">
+        {isPublic
+          ? "Your challenge is listed in the Challenges lobby, so anyone can join it. You can also invite someone directly:"
+          : "This challenge is invite-only. Share the link or code with the friend you want:"}
+      </p>
+      <p className="invite-code" aria-label={`Invite code ${code}`}>
+        {code}
+      </p>
+      <div className="flex flex-wrap gap-3">
+        <button className={btn} onClick={() => copy("link")}>
+          {copied === "link" ? "Link copied ✓" : "Copy invite link"}
+        </button>
+        <button className={btn} onClick={() => copy("code")}>
+          {copied === "code" ? "Code copied ✓" : "Copy code"}
+        </button>
+        {typeof navigator.share === "function" && (
+          <button
+            className={btn}
+            onClick={() =>
+              navigator
+                .share({
+                  title: "Join my FitStake challenge",
+                  text: `Join my FitStake challenge with code ${code}`,
+                  url: link,
+                })
+                .catch(() => {})
+            }
+          >
+            Share…
+          </button>
+        )}
+      </div>
+      <ol className="invite-steps">
+        <li>Your friend opens the link (or goes to FitStake and taps “Join a friend”).</li>
+        <li>They enter their name and email, plus the code above if asked.</li>
+        <li>This page updates by itself when they join. Meanwhile, set up your own rewards and card below.</li>
+      </ol>
+    </div>
+  );
+}
+
 function Setup({
+  waitingForFriend,
   me,
   challengeId,
   userId,
   apply,
   busy,
 }: {
+  waitingForFriend: boolean;
   me: State["participants"][number];
   challengeId: string;
   userId: string;
@@ -925,6 +1157,12 @@ function Setup({
 
   return (
     <section className={card + " mb-6 space-y-5"}>
+      {waitingForFriend && (
+        <p className="setup-note" role="status">
+          Your friend hasn’t joined yet. You can set up now; the challenge
+          starts once you both have rewards locked and a card enrolled.
+        </p>
+      )}
       <div>
         <p className="eyebrow">DAY 1 · YOUR MOTIVATION, LOCKED IN</p>
         <h2 className="setup-title">2. AI recommends rewards</h2>

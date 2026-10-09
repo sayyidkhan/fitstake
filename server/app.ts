@@ -65,6 +65,7 @@ app.post(
       // Any length from a single day up to a year.
       durationDays: z.number().int().min(1).max(365).default(30),
       activity: z.enum(ACTIVITY_IDS).default(DEFAULT_ACTIVITY),
+      isPublic: z.boolean().default(true),
     }),
   ),
   async (c) => c.json(await svc.createChallenge(db, c.req.valid("json")), 201),
@@ -77,6 +78,14 @@ app.post(
     const { inviteCode, ...p } = c.req.valid("json");
     return c.json(await svc.joinChallenge(db, inviteCode, p));
   },
+);
+
+app.get("/lobby", zValidator("query", z.object({ activity: z.enum(ACTIVITY_IDS).optional() })), async (c) =>
+  c.json(await svc.listLobby(db, c.req.valid("query").activity)),
+);
+
+app.post("/lobby/:id/join", zValidator("json", person), async (c) =>
+  c.json(await svc.joinPublicChallenge(db, c.req.param("id"), c.req.valid("json"))),
 );
 
 app.get("/challenges/:id", async (c) =>

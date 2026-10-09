@@ -13,6 +13,7 @@ export type State = {
     inviteCode: string;
     durationDays: number;
     activity: string;
+    isPublic: boolean;
     status: "draft" | "active" | "settled";
     winnerUserId: string | null;
     loserUserId: string | null;
@@ -71,7 +72,21 @@ async function call<T>(path: string, body?: unknown): Promise<T> {
   return json as T;
 }
 
+export type LobbyEntry = {
+  id: string;
+  name: string;
+  activity: string;
+  durationDays: number;
+  host: string;
+  players: number;
+  maxPlayers: number;
+};
+
 export const api = {
+  lobby: (activity?: string) =>
+    call<LobbyEntry[]>(`/lobby${activity ? `?activity=${encodeURIComponent(activity)}` : ""}`),
+  joinLobby: (id: string, p: { name: string; email: string }) =>
+    call<{ challengeId: string; userId: string }>(`/lobby/${id}/join`, p),
   config: () =>
     call<{ payments: "simulated" | "reap_sandbox" | "unavailable" }>("/config"),
   create: (
@@ -79,10 +94,11 @@ export const api = {
     creator: { name: string; email: string },
     durationDays: number,
     activity: string,
+    isPublic: boolean,
   ) =>
     call<{ challengeId: string; userId: string; inviteCode: string }>(
       "/challenges",
-      { name, creator, durationDays, activity },
+      { name, creator, durationDays, activity, isPublic },
     ),
   join: (inviteCode: string, p: { name: string; email: string }) =>
     call<{ challengeId: string; userId: string }>("/join", {

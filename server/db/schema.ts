@@ -19,6 +19,8 @@ export const challenges = sqliteTable("challenges", {
   durationDays: integer("duration_days").notNull().default(30),
   // Activity id from shared/activities.ts
   activity: text("activity").notNull().default("any"),
+  // Public challenges appear in the lobby while they have an open seat.
+  isPublic: integer("is_public", { mode: "boolean" }).notNull().default(true),
   // draft -> active (both rewards locked + authorised) -> settled
   status: text("status", { enum: ["draft", "active", "settled"] }).notNull().default("draft"),
   startedAt: integer("started_at", { mode: "timestamp" }),

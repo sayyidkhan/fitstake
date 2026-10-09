@@ -112,3 +112,46 @@ describe("activity type", () => {
     expect(ACTIVITIES.some((a) => a.id === DEFAULT_ACTIVITY)).toBe(true);
   });
 });
+
+describe("lobby (server browser)", () => {
+  const email = (p: string) => `${p}${crypto.randomUUID()}@x.io`;
+
+  it("lists open public challenges and hides private, full and started ones", async () => {
+    const open = await svc.createChallenge(db, { name: "open-" + crypto.randomUUID(), activity: "swimming", creator: { name: "Host One", email: email("h") } });
+    const priv = await svc.createChallenge(db, { name: "priv-" + crypto.randomUUID(), isPublic: false, creator: { name: "H", email: email("h") } });
+    const full = await svc.createChallenge(db, { name: "full-" + crypto.randomUUID(), creator: { name: "H", email: email("h") } });
+    await svc.joinChallenge(db, full.inviteCode, { name: "J", email: email("j") });
+
+    const ids = (await svc.listLobby(db)).map((c) => c.id);
+    expect(ids).toContain(open.challengeId);
+    expect(ids).not.toContain(priv.challengeId);
+    expect(ids).not.toContain(full.challengeId);
+
+    const entry = (await svc.listLobby(db)).find((c) => c.id === open.challengeId)!;
+    expect(entry).toMatchObject({ activity: "swimming", host: "Host", players: 1, maxPlayers: 2 });
+    expect(JSON.stringify(entry)).not.toMatch(/@|inviteCode/);
+    expect((await svc.listLobby(db, "running")).map((c) => c.id)).not.toContain(open.challengeId);
+  });
+
+  it("joining from the lobby fills the seat and removes it from the list", async () => {
+    const c = await svc.createChallenge(db, { name: "pick-" + crypto.randomUUID(), creator: { name: "Host", email: email("h") } });
+    await svc.joinPublicChallenge(db, c.challengeId, { name: "Guest", email: email("g") });
+    expect((await svc.listLobby(db)).map((x) => x.id)).not.toContain(c.challengeId);
+    await expect(svc.joinPublicChallenge(db, c.challengeId, { name: "Late", email: email("l") })).rejects.toThrow(/full/);
+  });
+
+  it("cannot join a private challenge by id, only by invite code", async () => {
+    const c = await svc.createChallenge(db, { name: "p", isPublic: false, creator: { name: "Host", email: email("h") } });
+    await expect(svc.joinPublicChallenge(db, c.challengeId, { name: "G", email: email("g") })).rejects.toThrow(/not found/i);
+    await expect(svc.joinChallenge(db, c.inviteCode, { name: "G", email: email("g") })).resolves.toBeTruthy();
+  });
+
+  it("never overfills when several people join at once", async () => {
+    const c = await svc.createChallenge(db, { name: "race-" + crypto.randomUUID(), creator: { name: "Host", email: email("h") } });
+    const results = await Promise.allSettled(
+      Array.from({ length: 5 }, (_, i) => svc.joinPublicChallenge(db, c.challengeId, { name: `G${i}`, email: email("g") })),
+    );
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    expect((await svc.getState(db, c.challengeId)).participants).toHaveLength(2);
+  });
+});

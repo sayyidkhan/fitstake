@@ -908,3 +908,130 @@ footer {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+.invite-card {
+  border-color: #b9d18a;
+  background: #f5fae9;
+}
+.invite-code {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: #253b32;
+  margin: 10px 0 16px;
+  user-select: all;
+}
+.invite-steps {
+  margin: 18px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #4f6254;
+}
+.setup-note {
+  background: #fff7e0;
+  border: 1px solid #ecd9a0;
+  color: #6b5416;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.lobby {
+  max-width: 860px;
+  padding-top: 50px;
+}
+.lobby h1 {
+  font-size: 44px;
+  font-weight: 800;
+  letter-spacing: -2px;
+  color: #253b32;
+  margin: 8px 0 14px;
+}
+.lobby-who {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 24px;
+}
+.lobby-who label {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.lobby-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 28px 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4f6254;
+}
+.lobby-head .text-link {
+  margin: 0;
+}
+.lobby-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 12px;
+}
+.lobby-row {
+  display: grid;
+  grid-template-columns: 48px 1fr auto auto;
+  gap: 16px;
+  align-items: center;
+}
+.lobby-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: #e5efd3;
+  font-size: 24px;
+}
+.lobby-row h2 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #253b32;
+}
+.lobby-row p {
+  font-size: 12px;
+  color: #5d6c5f;
+  margin-top: 2px;
+}
+.lobby-seats {
+  font-size: 12px;
+  font-weight: 600;
+  color: #4f6254;
+  white-space: nowrap;
+}
+.lobby-empty {
+  text-align: center;
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  padding: 40px 20px;
+}
+@media (max-width: 650px) {
+  .lobby h1 {
+    font-size: 32px;
+  }
+  .lobby-who {
+    grid-template-columns: 1fr;
+  }
+  .lobby-row {
+    grid-template-columns: 44px 1fr;
+  }
+  .lobby-seats,
+  .lobby-row .action {
+    grid-column: 2;
+    justify-self: start;
+  }
+}

@@ -1,0 +1,1 @@
+ALTER TABLE `challenges` ADD `is_public` integer DEFAULT true NOT NULL;
