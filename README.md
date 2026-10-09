@@ -5,7 +5,16 @@ Vite + React + Tailwind frontend, Hono API at `/api/*` (Vercel serverless), Turs
 ## Deploy
 Production branch: `claude/loving-euler-z1g9y3` (set under Vercel → Settings → Git).
 
-Import the repo in Vercel and set the env vars from `.env.example` for Production, Preview and Development. The build runs `db:migrate` against Turso automatically, then `vite build`. The API is served from `api/[...route].ts` at `/api/*`.
+Import the repo in Vercel and set the env vars from `.env.example` for Production, Preview and Development. The build runs `db:migrate` against Turso automatically, then `vite build`. The API is served from `api/index.ts`; `vercel.json` routes every `/api/*` path to this function, including nested challenge routes. Named `GET` and `POST` exports use Vercel's Web Request/Response handlers.
+
+Before deploying, open **Vercel → Project Settings → Environment Variables** and add:
+
+- `TURSO_DATABASE_URL`: your Turso database URL (`libsql://…`; the project's example is in `.env.example`).
+- `TURSO_AUTH_TOKEN`: a valid token for that database.
+
+Select **Production** for deployments from the configured production branch and **Preview** for other branches. Save the variables, then redeploy; existing deployments do not receive newly saved values. A local `.env` file and `.env.example` do not configure Vercel's environment variables. Keep these variables server-side, without a `VITE_` prefix.
+
+If the build reports `ENOTFOUND turso_database_url-not-set.invalid`, the deployment is missing `TURSO_DATABASE_URL`. The migration script now checks both required variables before connecting and reports the missing names directly. Keep migrations enabled so a successful deployment has its database tables ready.
 
 Optional local run: `cp .env.example .env`, fill it in, then `npm run dev` (web :5173, api :8787) and `npm test`.
 
