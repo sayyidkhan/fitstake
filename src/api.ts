@@ -25,6 +25,8 @@ export type State = {
     rewards: Reward[];
     authorised: boolean;
     enrolmentPending: boolean;
+    ceilingCents?: number | null;
+    requiredCeilingCents?: number | null;
   }[];
   leaderboard: {
     userId: string;
@@ -50,10 +52,13 @@ export type Product = {
   tier: "lowest" | "best";
   priceCents: number;
   imageUrl?: string;
+  demoOnly?: boolean;
 };
 export type Recommendation = {
   lowest: Product;
   best: Product;
+  options: { lowest: Product[]; best: Product[] };
+  budgetCents: number;
   reasoning: string;
   source: string;
 };
@@ -113,10 +118,18 @@ export const api = {
     }),
   state: (id: string) => call<State>(`/challenges/${id}`),
   merchants: () => call<Product[]>("/merchants"),
-  recommend: (id: string, preferences: string) =>
-    call<Recommendation>(`/challenges/${id}/recommend`, { preferences }),
-  lock: (id: string, userId: string, lowestId: string, bestId: string) =>
-    call<State>(`/challenges/${id}/rewards`, { userId, lowestId, bestId }),
+  recommend: (id: string, preferences: string, budgetCents: number) =>
+    call<Recommendation>(`/challenges/${id}/recommend`, { preferences, budgetCents }),
+  lock: (
+    id: string,
+    userId: string,
+    lowestId: string,
+    bestId: string,
+    budgetCents: number,
+  ) =>
+    call<State>(`/challenges/${id}/rewards`, { userId, lowestId, bestId, budgetCents }),
+  updateCeiling: (id: string, userId: string, spendingCeilingCents: number) =>
+    call<State>(`/challenges/${id}/ceiling`, { userId, spendingCeilingCents }),
   authorize: (id: string, userId: string, spendingCeilingCents: number) =>
     call<{ approvalUrl: string | null; state: State }>(
       `/challenges/${id}/authorize`,

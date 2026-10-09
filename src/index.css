@@ -1220,3 +1220,82 @@ button.text-red-700 {
     height: 130px;
   }
 }
+
+/* Spending cap + reward options */
+.cap-box {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px;
+  align-items: center;
+  background: #f1f5e8;
+  border: 1px solid #dce5cf;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-top: 10px;
+}
+.cap-box p {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #4f6254;
+}
+.cap-field {
+  display: grid;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #3f554a;
+}
+.price-band {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: #6b7d4a;
+  margin-left: 4px;
+}
+.option-group {
+  margin-top: 14px;
+}
+.option-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+.option-chip {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  text-align: left;
+  background: #fff;
+  border: 1px solid #dce5cf;
+  border-radius: 10px;
+  padding: 8px;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+.option-chip:hover {
+  border-color: #a9c27a;
+}
+.option-chip.selected {
+  border-color: #5f7a45;
+  background: #f1f7e4;
+  box-shadow: 0 0 0 1px #5f7a45 inset;
+}
+.option-chip b {
+  display: block;
+  font-size: 12px;
+  color: #253b32;
+}
+.option-chip small {
+  font-size: 11px;
+  color: #5d6c5f;
+}
+.chip-img {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 8px;
+}
+@media (max-width: 650px) {
+  .cap-box {
+    grid-template-columns: 1fr;
+  }
+}
