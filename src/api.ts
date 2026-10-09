@@ -19,7 +19,7 @@ export type State = {
     loserUserId: string | null;
   };
   participants: {
-    user: { id: string; name: string; email: string };
+    user: { id: string; name: string };
     rewards: Reward[];
     authorised: boolean;
     enrolmentPending: boolean;
@@ -86,7 +86,7 @@ export const api = {
   lobby: (activity?: string) =>
     call<LobbyEntry[]>(`/lobby${activity ? `?activity=${encodeURIComponent(activity)}` : ""}`),
   joinLobby: (id: string, p: { name: string; email: string }) =>
-    call<{ challengeId: string; userId: string }>(`/lobby/${id}/join`, p),
+    call<{ challengeId: string; userId: string }>(`/lobby/${id}/join`, { ...p, acceptedTerms: true }),
   config: () =>
     call<{ payments: "simulated" | "reap_sandbox" | "unavailable" }>("/config"),
   create: (
@@ -98,12 +98,13 @@ export const api = {
   ) =>
     call<{ challengeId: string; userId: string; inviteCode: string }>(
       "/challenges",
-      { name, creator, durationDays, activity, isPublic },
+      { name, creator, durationDays, activity, isPublic, acceptedTerms: true },
     ),
   join: (inviteCode: string, p: { name: string; email: string }) =>
     call<{ challengeId: string; userId: string }>("/join", {
       inviteCode,
       ...p,
+      acceptedTerms: true,
     }),
   state: (id: string) => call<State>(`/challenges/${id}`),
   merchants: () => call<Product[]>("/merchants"),

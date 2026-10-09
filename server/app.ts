@@ -12,6 +12,8 @@ const person = z.object({
   name: z.string().min(1).max(60),
   email: z.string().email(),
 });
+// Users must accept the Terms and Privacy Notice before a challenge is created or joined.
+const acceptedTerms = z.literal(true);
 const ids = z.object({ userId: z.string().min(1) });
 
 export const app = new Hono().basePath("/api");
@@ -62,6 +64,7 @@ app.post(
     z.object({
       name: z.string().min(1).max(80),
       creator: person,
+      acceptedTerms,
       // Any length from a single day up to a year.
       durationDays: z.number().int().min(1).max(365).default(30),
       activity: z.enum(ACTIVITY_IDS).default(DEFAULT_ACTIVITY),
@@ -73,9 +76,12 @@ app.post(
 
 app.post(
   "/join",
-  zValidator("json", person.extend({ inviteCode: z.string().min(4).max(16) })),
+  zValidator(
+    "json",
+    person.extend({ inviteCode: z.string().min(4).max(16), acceptedTerms }),
+  ),
   async (c) => {
-    const { inviteCode, ...p } = c.req.valid("json");
+    const { inviteCode, acceptedTerms: _accepted, ...p } = c.req.valid("json");
     return c.json(await svc.joinChallenge(db, inviteCode, p));
   },
 );
@@ -84,8 +90,13 @@ app.get("/lobby", zValidator("query", z.object({ activity: z.enum(ACTIVITY_IDS).
   c.json(await svc.listLobby(db, c.req.valid("query").activity)),
 );
 
-app.post("/lobby/:id/join", zValidator("json", person), async (c) =>
-  c.json(await svc.joinPublicChallenge(db, c.req.param("id"), c.req.valid("json"))),
+app.post(
+  "/lobby/:id/join",
+  zValidator("json", person.extend({ acceptedTerms })),
+  async (c) => {
+    const { acceptedTerms: _accepted, ...p } = c.req.valid("json");
+    return c.json(await svc.joinPublicChallenge(db, c.req.param("id"), p));
+  },
 );
 
 app.get("/challenges/:id", async (c) =>

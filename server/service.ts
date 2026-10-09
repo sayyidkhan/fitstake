@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import type { DB } from "./db/client.js";
 import * as t from "./db/schema.js";
+import { TERMS_VERSION } from "./legal.js";
 import { findProduct } from "./merchants.js";
 import { getActivity } from "../shared/activities.js";
 import { getReap, type CheckoutResult, type ReapClient } from "./reap.js";
@@ -14,11 +15,19 @@ export class HttpError extends Error {
 
 const ENROLLMENT_DAYS = 365;
 
+// Every create/join is an explicit acceptance of the current Terms and Privacy Notice.
 async function upsertUser(db: DB, name: string, email: string) {
   const e = email.trim().toLowerCase();
+  const acceptance = { termsVersion: TERMS_VERSION, termsAcceptedAt: new Date() };
   const [existing] = await db.select().from(t.users).where(eq(t.users.email, e));
-  if (existing) return existing;
-  const [created] = await db.insert(t.users).values({ name: name.trim(), email: e }).returning();
+  if (existing) {
+    await db.update(t.users).set(acceptance).where(eq(t.users.id, existing.id));
+    return { ...existing, ...acceptance };
+  }
+  const [created] = await db
+    .insert(t.users)
+    .values({ name: name.trim(), email: e, ...acceptance })
+    .returning();
   return created!;
 }
 
@@ -344,6 +353,10 @@ function appUrl() {
   return process.env.APP_URL ?? (host ? `https://${host}` : "http://localhost:5173");
 }
 
+function toPublicUser(u: { id: string; name: string }) {
+  return { id: u.id, name: u.name };
+}
+
 export async function getState(db: DB, challengeId: string) {
   const [challenge] = await db.select().from(t.challenges).where(eq(t.challenges.id, challengeId));
   if (!challenge) throw new HttpError(404, "Challenge not found");
@@ -362,7 +375,8 @@ export async function getState(db: DB, challengeId: string) {
   return {
     challenge,
     participants: people.map((p) => ({
-      user: users.find((u) => u.id === p.userId)!,
+      // Only the name is public to other participants; emails stay private.
+      user: toPublicUser(users.find((u) => u.id === p.userId)!),
       rewards: rewards.filter((r) => r.userId === p.userId),
       authorised: auths.some((a) => a.userId === p.userId && a.status === "active"),
       enrolmentPending: auths.some((a) => a.userId === p.userId && a.status === "pending"),

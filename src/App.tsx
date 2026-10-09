@@ -6,6 +6,7 @@ import {
   DEFAULT_ACTIVITY,
   getActivity,
 } from "../shared/activities";
+import { LEGAL, LegalPage, type LegalPageId } from "./legal";
 
 type Session = { challengeId: string; userId: string };
 const KEY = "fitstake.session";
@@ -98,7 +99,7 @@ const DETAILS = [
   },
   {
     you: "Enrol a card on Reap’s secure hosted page and set a spending ceiling.",
-    app: "Stores only your enrolment reference and your ceiling. Card details stay with Reap.",
+    app: "Stores your name, email, enrolment reference and spending ceiling. Card details stay with Reap.",
     note: "No money is held in escrow. Reap’s automatic payment mandates aren’t available yet, so you approve each final-day charge yourself.",
   },
   {
@@ -165,7 +166,7 @@ function HowItWorks({ onStart }: { onStart: () => void }) {
         </details>
         <details>
           <summary>Where are my card details stored?</summary>
-          <p>With the payment provider, Reap. FitStake keeps only your enrolment reference and the spending ceiling you set.</p>
+          <p>With the payment provider, Reap. FitStake keeps your name, email, enrolment reference and the spending ceiling you set. See the <a href="#privacy">Privacy Policy</a> and <a href="#data-policy">Data Policy</a>.</p>
         </details>
         <details>
           <summary>What if the quote is higher than my ceiling?</summary>
@@ -184,13 +185,15 @@ function HowItWorks({ onStart }: { onStart: () => void }) {
   );
 }
 
-type Page = "home" | "how" | "lobby";
-const pageFromHash = (): Page =>
-  window.location.hash === "#how-it-works"
-    ? "how"
-    : window.location.hash === "#challenges"
-      ? "lobby"
-      : "home";
+type Page = "home" | "how" | "lobby" | LegalPageId;
+const PAGE_BY_HASH: Record<string, Page> = {
+  "#how-it-works": "how",
+  "#challenges": "lobby",
+  "#privacy": "privacy",
+  "#terms": "terms",
+  "#data-policy": "data-policy",
+};
+const pageFromHash = (): Page => PAGE_BY_HASH[window.location.hash] ?? "home";
 
 const card = "panel rounded-2xl p-5";
 const btn = "action px-4 py-2 font-semibold disabled:opacity-40";
@@ -243,6 +246,12 @@ export default function App() {
     return () => clearInterval(t);
   }, [session, waiting]);
 
+  if (page === "privacy" || page === "terms" || page === "data-policy")
+    return (
+      <Shell page={page}>
+        <LegalPage id={page} />
+      </Shell>
+    );
   if (page === "lobby")
     return (
       <Shell page={page}>
@@ -646,6 +655,14 @@ function Shell({ children, page }: { children: React.ReactNode; page: Page }) {
       <main className="workspace">{children}</main>
       <footer>
         <span>FITSTAKE · MADE FOR YOUR NEXT PERSONAL BEST</span>
+        <nav className="footer-legal" aria-label="Legal">
+          <a href="#privacy">Privacy Policy</a>
+          <a href="#terms">Terms</a>
+          <a href="#data-policy">Data Policy</a>
+          <span>
+            © {new Date().getFullYear()} {LEGAL.operator}
+          </span>
+        </nav>
         <span>
           Simulated fitness. Sandbox purchases. No real money or deliveries.
         </span>
@@ -883,9 +900,18 @@ function Start({
                 onChange={(e) => setAgreed(e.target.checked)}
               />
               <span>
-                I agree to the scoring rules: active minutes (capped at
-                90 a day) plus a bonus for each active day. Ties use active
-                days, then steps.
+                I agree to the{" "}
+                <a href="#terms" target="_blank" rel="noopener noreferrer">
+                  Terms
+                </a>{" "}
+                and{" "}
+                <a href="#privacy" target="_blank" rel="noopener noreferrer">
+                  Privacy Policy
+                </a>
+                , including the scoring rules: active minutes (capped at 90 a
+                day) plus a bonus for each active day. Ties use active days,
+                then steps. I consent to {LEGAL.operator} collecting and using my
+                name and email to run this challenge.
               </span>
             </label>
             {error && (
@@ -958,7 +984,8 @@ function Lobby({ onJoined }: { onJoined: (s: Session) => void }) {
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [joining, setJoining] = useState<string | null>(null);
-  const ok = name.trim().length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const [agreed, setAgreed] = useState(false);
+  const ok = name.trim().length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && agreed;
 
   const refresh = useCallback(() => {
     api
@@ -1020,6 +1047,20 @@ function Lobby({ onJoined }: { onJoined: (s: Session) => void }) {
             ))}
           </select>
         </label>
+        <label className="agree">
+          <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+          <span>
+            I agree to the{" "}
+            <a href="#terms" target="_blank" rel="noopener noreferrer">
+              Terms
+            </a>{" "}
+            and{" "}
+            <a href="#privacy" target="_blank" rel="noopener noreferrer">
+              Privacy Policy
+            </a>
+            . I consent to {LEGAL.operator} collecting and using my name and email to join.
+          </span>
+        </label>
       </div>
       {error && (
         <p role="alert" className="error-banner mt-4">
@@ -1065,7 +1106,7 @@ function Lobby({ onJoined }: { onJoined: (s: Session) => void }) {
           );
         })}
       </ul>
-      {!ok && list && list.length > 0 && <p className="field-hint">Add your name and email above to join.</p>}
+      {!ok && list && list.length > 0 && <p className="field-hint">Add your name and email, and accept the terms above, to join.</p>}
     </section>
   );
 }
@@ -1193,6 +1234,10 @@ function Setup({
                 Suggest
               </button>
             </div>
+            <small className="field-hint">
+              Don’t include health or medical details. Your text is sent to OpenAI
+              to suggest rewards.
+            </small>
             {rec && (
               <div className="mt-3 text-sm">
                 <div className="recommendation-grid">
@@ -1242,6 +1287,14 @@ function Setup({
               {simulated
                 ? "Local demo: simulate enrolment without entering a card. Your ceiling caps the final quote, including shipping and tax. No payment provider is contacted."
                 : "Enrol on Reap’s hosted sandbox page. Your ceiling caps the final quote, including shipping and tax. Each final-day charge needs your approval; no funds are held."}
+            </p>
+            <p className="field-hint">
+              To set this up, your name and email are shared with Reap. Card
+              details are entered only on Reap’s page. See the{" "}
+              <a href="#privacy" target="_blank" rel="noopener noreferrer">
+                Privacy Policy
+              </a>
+              .
             </p>
             <label className="flex items-center gap-2">
               S${" "}

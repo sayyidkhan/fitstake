@@ -22,6 +22,13 @@
       "when": 1791545767294,
       "tag": "0002_cloudy_the_watchers",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1791546104242,
+      "tag": "0003_terms_acceptance",
+      "breakpoints": true
     }
   ]
 }
