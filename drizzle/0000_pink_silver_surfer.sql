@@ -72,6 +72,7 @@ CREATE TABLE `transactions` (
 	`recipient_user_id` text NOT NULL,
 	`reward_choice_id` text NOT NULL,
 	`idempotency_key` text NOT NULL,
+	`attempts` integer DEFAULT 0 NOT NULL,
 	`amount_cents` integer,
 	`currency` text DEFAULT 'SGD' NOT NULL,
 	`status` text DEFAULT 'pending' NOT NULL,

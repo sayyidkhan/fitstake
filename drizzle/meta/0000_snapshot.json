@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "3a26d12f-bce2-4848-b4bc-4f763954e41e",
+  "id": "4ee5132d-8fee-4083-b7a4-3f8fe787cc76",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "activity_logs": {
@@ -534,6 +534,14 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         },
         "amount_cents": {
           "name": "amount_cents",

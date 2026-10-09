@@ -47,13 +47,23 @@ app.post(
 
 app.post(
   "/challenges/:id/authorize",
-  zValidator("json", ids.extend({ spendingCeilingCents: z.number().int().min(100).max(100_000) })),
+  zValidator("json", ids.extend({ spendingCeilingCents: z.number().int().min(100).max(100_000), returnUrl: z.string().url() })),
   async (c) => {
     const b = c.req.valid("json");
-    await svc.authorize(db, c.req.param("id"), b.userId, b.spendingCeilingCents);
-    return c.json(await svc.getState(db, c.req.param("id")));
+    const { approvalUrl } = await svc.authorize(db, c.req.param("id"), b.userId, b.spendingCeilingCents, b.returnUrl);
+    return c.json({ approvalUrl, state: await svc.getState(db, c.req.param("id")) });
   },
 );
+
+app.post("/challenges/:id/enrollment-status", zValidator("json", ids), async (c) => {
+  await svc.refreshEnrollment(db, c.req.param("id"), c.req.valid("json").userId);
+  return c.json(await svc.getState(db, c.req.param("id")));
+});
+
+app.post("/challenges/:id/refresh-transactions", async (c) => {
+  await svc.refreshTransactions(db, c.req.param("id"));
+  return c.json(await svc.getState(db, c.req.param("id")));
+});
 
 // POC only: simulated fitness data and the "Simulate Day 30" action.
 app.post("/challenges/:id/simulate-activity", async (c) => {

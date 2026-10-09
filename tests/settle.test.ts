@@ -23,7 +23,7 @@ async function setup() {
   const b = await svc.joinChallenge(db, a.inviteCode, { name: "John", email: `j${crypto.randomUUID()}@x.io` });
   for (const u of [a.userId, b.userId]) {
     await svc.lockRewards(db, a.challengeId, u, "sixeleven-cococoast-500ml", "kydra-axis-linerless-shorts-navy-m");
-    await svc.authorize(db, a.challengeId, u, 10_000);
+    await svc.authorize(db, a.challengeId, u, 10_000, "http://localhost");
   }
   return a.challengeId;
 }
@@ -39,7 +39,7 @@ describe("challenge lifecycle", () => {
     const s = await svc.getState(db, id);
     expect(s.challenge.status).toBe("settled");
     expect(s.transactions).toHaveLength(2);
-    expect(s.transactions.every((t) => t.status === "checkout_opened")).toBe(true);
+    expect(s.transactions.every((t) => t.status === "completed")).toBe(true);
     const amounts = s.transactions.map((t) => t.amountCents).sort((x, y) => x! - y!);
     expect(amounts).toEqual([385, 5800]);
     // loser pays winner's best reward
@@ -52,7 +52,7 @@ describe("challenge lifecycle", () => {
     const b = await svc.joinChallenge(db, a.inviteCode, { name: "B", email: `b${crypto.randomUUID()}@x.io` });
     for (const u of [a.userId, b.userId]) {
       await svc.lockRewards(db, a.challengeId, u, "sixeleven-cococoast-500ml", "kydra-axis-linerless-shorts-navy-m");
-      await svc.authorize(db, a.challengeId, u, 500); // S$5 ceiling
+      await svc.authorize(db, a.challengeId, u, 500, "http://localhost"); // S$5 ceiling
     }
     await svc.simulateActivity(db, a.challengeId);
     await svc.settle(db, a.challengeId);

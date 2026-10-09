@@ -7,6 +7,8 @@ export type Product = {
   tier: "lowest" | "best";
   priceCents: number;
   currency: "SGD";
+  // Pin a Reap variant id (e.g. the exact size/colour) once known; otherwise resolved via product search.
+  variantId?: string;
 };
 
 export const CATALOGUE: Product[] = [

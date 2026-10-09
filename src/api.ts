@@ -1,7 +1,7 @@
 export type Reward = { id: string; userId: string; tier: "lowest" | "best"; merchant: string; productName: string; priceCents: number };
 export type State = {
   challenge: { id: string; name: string; inviteCode: string; status: "draft" | "active" | "settled"; winnerUserId: string | null; loserUserId: string | null };
-  participants: { user: { id: string; name: string; email: string }; rewards: Reward[]; authorised: boolean }[];
+  participants: { user: { id: string; name: string; email: string }; rewards: Reward[]; authorised: boolean; enrolmentPending: boolean }[];
   leaderboard: { userId: string; points: number; adherentDays: number; totalSteps: number }[];
   transactions: { id: string; payerUserId: string; recipientUserId: string; status: string; amountCents: number | null; checkoutUrl: string | null; failureReason: string | null }[];
 };
@@ -28,7 +28,10 @@ export const api = {
   merchants: () => call<Product[]>("/merchants"),
   recommend: (id: string, preferences: string) => call<Recommendation>(`/challenges/${id}/recommend`, { preferences }),
   lock: (id: string, userId: string, lowestId: string, bestId: string) => call<State>(`/challenges/${id}/rewards`, { userId, lowestId, bestId }),
-  authorize: (id: string, userId: string, spendingCeilingCents: number) => call<State>(`/challenges/${id}/authorize`, { userId, spendingCeilingCents }),
+  authorize: (id: string, userId: string, spendingCeilingCents: number) =>
+    call<{ approvalUrl: string | null; state: State }>(`/challenges/${id}/authorize`, { userId, spendingCeilingCents, returnUrl: window.location.origin }),
+  enrollmentStatus: (id: string, userId: string) => call<State>(`/challenges/${id}/enrollment-status`, { userId }),
+  refreshTransactions: (id: string) => call<State>(`/challenges/${id}/refresh-transactions`, {}),
   simulate: (id: string) => call<State>(`/challenges/${id}/simulate-activity`, {}),
   settle: (id: string) => call<State>(`/challenges/${id}/settle`, {}),
 };

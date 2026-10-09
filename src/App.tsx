@@ -65,7 +65,7 @@ export default function App() {
                 <li key={r.id}>{r.tier === "best" ? "Best" : "Lowest"}: {r.merchant} · {r.productName} ({money(r.priceCents)})</li>
               )) : <li className="text-slate-500">Rewards not locked</li>}
             </ul>
-            <p className="mt-2 text-sm">{p.authorised ? "✅ Payment authorised" : "⏳ Not authorised"}</p>
+            <p className="mt-2 text-sm">{p.authorised ? "✅ Card enrolled" : p.enrolmentPending ? "⏳ Awaiting card enrolment" : "⏳ No card yet"}</p>
           </div>
         ))}
         {participants.length < 2 && <div className={card + " text-slate-400"}>Waiting for your friend. Share code <b>{challenge.inviteCode}</b>.</div>}
@@ -102,11 +102,17 @@ export default function App() {
             {transactions.map((t) => (
               <li key={t.id}>
                 {nameOf(t.payerUserId)} buys for {nameOf(t.recipientUserId)}: {t.amountCents ? money(t.amountCents) : "—"} ·{" "}
-                <b className={t.status === "checkout_opened" ? "text-teal-400" : "text-amber-400"}>{t.status}</b>
+                <b className={t.status === "completed" ? "text-teal-400" : "text-amber-400"}>{t.status.replace("_", " ")}</b>
+                {t.status === "requires_approval" && t.checkoutUrl && t.payerUserId === session.userId && (
+                  <a className="ml-2 text-teal-400 underline" href={t.checkoutUrl} target="_blank" rel="noopener noreferrer">Approve payment</a>
+                )}
                 {t.failureReason && <span className="text-red-300"> ({t.failureReason})</span>}
               </li>
             ))}
           </ul>
+          {transactions.some((t) => t.status === "requires_approval" || t.status === "checkout_opened") && (
+            <button className={btn + " mt-3 mr-3"} disabled={busy} onClick={() => apply(api.refreshTransactions(challenge.id))}>Refresh payment status</button>
+          )}
           {transactions.some((t) => t.status === "failed") && (
             <button className={btn + " mt-3"} disabled={busy} onClick={() => apply(api.settle(challenge.id))}>Retry failed checkouts</button>
           )}
@@ -187,11 +193,18 @@ function Setup({ me, challengeId, userId, apply, busy }: { me: State["participan
       </div>
       <div>
         <h2 className="font-semibold">2. Authorise spending</h2>
-        {me.authorised ? <p className="text-sm text-slate-400">Authorised.</p> : (
+        {me.authorised ? <p className="text-sm text-slate-400">Card enrolled.</p> : (
           <div className="mt-2 space-y-2 text-sm">
-            <p className="text-slate-400">Set a ceiling for what you may be charged if you lose. Card details stay with the payment provider (sandbox here).</p>
+            <p className="text-slate-400">Enrol a card on Reap's hosted page (sandbox) and set a ceiling for what you may be charged if you lose. On Day 30 you'll approve each charge yourself.</p>
             <label className="flex items-center gap-2">S$ <input className={input + " max-w-28"} type="number" min={1} value={ceiling} onChange={(e) => setCeiling(Number(e.target.value))} /></label>
-            <button className={btn} disabled={busy || ceiling < 1} onClick={() => apply(api.authorize(challengeId, userId, Math.round(ceiling * 100)))}>Authorise</button>
+            <div className="flex flex-wrap gap-3">
+              <button className={btn} disabled={busy || ceiling < 1} onClick={async () => {
+                const r = await api.authorize(challengeId, userId, Math.round(ceiling * 100));
+                if (r.approvalUrl) window.open(r.approvalUrl, "_blank", "noopener");
+                apply(Promise.resolve(r.state));
+              }}>Enrol card</button>
+              {me.enrolmentPending && <button className={btn} disabled={busy} onClick={() => apply(api.enrollmentStatus(challengeId, userId))}>I've finished — check status</button>}
+            </div>
           </div>
         )}
       </div>
