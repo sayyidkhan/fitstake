@@ -2,11 +2,11 @@ import type { ReactNode } from "react";
 
 // Details only the operator can confirm. Replace every bracketed placeholder before launch.
 export const LEGAL = {
-  operator: "Cybrdeck",
+  operator: "FitStake",
+  legalEntity: "[operator legal name]",
   uen: "[UEN]",
   address: "[registered business address, Singapore]",
-  dpoEmail: "[privacy email, e.g. privacy@cybrdeck.com]",
-  website: "https://cybrdeck.com",
+  dpoEmail: "[privacy email]",
   lastUpdated: "9 October 2026",
   complaintsUrl: "https://www.pdpc.gov.sg",
 };
@@ -35,8 +35,8 @@ const PRIVACY: Doc = {
       body: (
         <>
           <p>
-            FitStake is operated by {LEGAL.operator}, a company in Singapore (UEN <Ph>{LEGAL.uen}</Ph>,
-            address <Ph>{LEGAL.address}</Ph>). In this notice, “we”, “us” and
+            FitStake is operated by <Ph>{LEGAL.legalEntity}</Ph>, a company in Singapore (UEN{" "}
+            <Ph>{LEGAL.uen}</Ph>, address <Ph>{LEGAL.address}</Ph>). In this notice, “we”, “us” and
             “our” mean {LEGAL.operator}.
           </p>
           <p>
@@ -467,7 +467,7 @@ const TERMS: Doc = {
       title: "15. Contact",
       body: (
         <p>
-          {LEGAL.operator}, UEN <Ph>{LEGAL.uen}</Ph>, <Ph>{LEGAL.address}</Ph>. Email{" "}
+          <Ph>{LEGAL.legalEntity}</Ph>, UEN <Ph>{LEGAL.uen}</Ph>, <Ph>{LEGAL.address}</Ph>. Email{" "}
           <Ph>{LEGAL.dpoEmail}</Ph>.
         </p>
       ),
