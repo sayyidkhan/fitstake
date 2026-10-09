@@ -3,6 +3,8 @@
 Vite + React + Tailwind frontend, Hono API at `/api/*` (Vercel serverless), Turso + Drizzle, OpenAI recommendations, Reap Agentic Payments (sandbox).
 
 ## Deploy
+Production branch: `claude/loving-euler-z1g9y3` (set under Vercel → Settings → Git).
+
 Import the repo in Vercel and set the env vars from `.env.example` for Production, Preview and Development. The build runs `db:migrate` against Turso automatically, then `vite build`. The API is served from `api/[...route].ts` at `/api/*`.
 
 Optional local run: `cp .env.example .env`, fill it in, then `npm run dev` (web :5173, api :8787) and `npm test`.
