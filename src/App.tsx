@@ -981,22 +981,9 @@ function Start({
             See how it works
           </a>
         </p>
-        <div className="cta-video-wrap">
-          <p className="meta">WATCH THE PITCH</p>
-          <video
-            className="cta-video"
-            src="/videos/fitstake-cta.mp4"
-            poster="/videos/fitstake-cta-poster.jpg"
-            playsInline
-            muted
-            loop
-            autoPlay
-            controls
-            aria-label="FitStake CTA video"
-          />
-        </div>
       </section>
-      <section className="onboarding panel" aria-labelledby="onboarding-title">
+      <div className="landing-side">
+        <section className="onboarding panel" aria-labelledby="onboarding-title">
         {!me ? (
           <AuthCard onAuthed={onAuthed} />
         ) : (
@@ -1179,8 +1166,23 @@ function Start({
           </>
         )}
       </section>
+      <div className="cta-video-wrap">
+        <p className="meta">WATCH THE PITCH</p>
+        <video
+          className="cta-video"
+          src="/videos/fitstake-cta.mp4"
+          poster="/videos/fitstake-cta-poster.jpg"
+          playsInline
+          muted
+          loop
+          autoPlay
+          controls
+          aria-label="FitStake CTA video"
+        />
+      </div>
     </div>
-    {me && <MyChallenges onOpen={onStart} />}
+  </div>
+  {me && <MyChallenges onOpen={onStart} />}
     </>
   );
 }
