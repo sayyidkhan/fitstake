@@ -12,6 +12,28 @@ export const users = sqliteTable("users", {
   // Record of the Terms and Privacy Notice version accepted, for PDPA accountability.
   termsVersion: text("terms_version"),
   termsAcceptedAt: integer("terms_accepted_at", { mode: "timestamp" }),
+  emailVerifiedAt: integer("email_verified_at", { mode: "timestamp" }),
+  createdAt: createdAt(),
+});
+
+// One-time email login codes. Only a hash is stored.
+export const loginCodes = sqliteTable("login_codes", {
+  id: id(),
+  email: text("email").notNull(),
+  codeHash: text("code_hash").notNull(),
+  expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+  attempts: integer("attempts").notNull().default(0),
+  consumedAt: integer("consumed_at", { mode: "timestamp" }),
+  createdAt: createdAt(),
+});
+
+// Browser sessions. The cookie holds a random token; only its hash is stored.
+export const sessions = sqliteTable("sessions", {
+  id: id(),
+  tokenHash: text("token_hash").notNull().unique(),
+  userId: text("user_id").notNull().references(() => users.id),
+  expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+  userAgent: text("user_agent"),
   createdAt: createdAt(),
 });
 
