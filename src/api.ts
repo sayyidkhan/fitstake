@@ -14,10 +14,11 @@ export type State = {
     durationDays: number;
     activity: string;
     isPublic: boolean;
-    status: "draft" | "active" | "settled";
+    status: "draft" | "active" | "settled" | "cancelled";
     winnerUserId: string | null;
     loserUserId: string | null;
   };
+  hostUserId?: string;
   participants: {
     user: { id: string; name: string };
     rewards: Reward[];
@@ -83,6 +84,8 @@ export type LobbyEntry = {
 };
 
 export const api = {
+  cancel: (id: string, userId: string) =>
+    call<State>(`/challenges/${id}/cancel`, { userId }),
   lobby: (activity?: string) =>
     call<LobbyEntry[]>(`/lobby${activity ? `?activity=${encodeURIComponent(activity)}` : ""}`),
   joinLobby: (id: string, p: { name: string; email: string }) =>

@@ -90,6 +90,11 @@ app.get("/lobby", zValidator("query", z.object({ activity: z.enum(ACTIVITY_IDS).
   c.json(await svc.listLobby(db, c.req.valid("query").activity)),
 );
 
+app.post("/challenges/:id/cancel", zValidator("json", ids), async (c) => {
+  await svc.cancelChallenge(db, c.req.param("id"), c.req.valid("json").userId);
+  return c.json(await svc.getState(db, c.req.param("id")));
+});
+
 app.post(
   "/lobby/:id/join",
   zValidator("json", person.extend({ acceptedTerms })),

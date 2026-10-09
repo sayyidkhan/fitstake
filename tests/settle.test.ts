@@ -155,3 +155,31 @@ describe("lobby (server browser)", () => {
     expect((await svc.getState(db, c.challengeId)).participants).toHaveLength(2);
   });
 });
+
+describe("cancelling a challenge", () => {
+  const email = (p: string) => `${p}${crypto.randomUUID()}@x.io`;
+
+  it("host cancels a waiting challenge; it leaves the lobby and can't be joined", async () => {
+    const c = await svc.createChallenge(db, { name: "cx-" + crypto.randomUUID(), creator: { name: "Host", email: email("h") } });
+    expect((await svc.listLobby(db)).map((x) => x.id)).toContain(c.challengeId);
+    await svc.cancelChallenge(db, c.challengeId, c.userId);
+    await svc.cancelChallenge(db, c.challengeId, c.userId); // idempotent
+    expect((await svc.getState(db, c.challengeId)).challenge.status).toBe("cancelled");
+    expect((await svc.listLobby(db)).map((x) => x.id)).not.toContain(c.challengeId);
+    await expect(svc.joinPublicChallenge(db, c.challengeId, { name: "G", email: email("g") })).rejects.toThrow(/cancelled/);
+    await expect(svc.joinChallenge(db, c.inviteCode, { name: "G", email: email("g") })).rejects.toThrow(/cancelled/);
+    await expect(svc.lockRewards(db, c.challengeId, c.userId, "sixeleven-cococoast-500ml", "kydra-axis-linerless-shorts-navy-m")).rejects.toThrow();
+  });
+
+  it("only the host can cancel, and not after the challenge has started", async () => {
+    const c = await svc.createChallenge(db, { name: "cx2", creator: { name: "Host", email: email("h") } });
+    const g = await svc.joinChallenge(db, c.inviteCode, { name: "Guest", email: email("g") });
+    await expect(svc.cancelChallenge(db, c.challengeId, g.userId)).rejects.toThrow(/host/);
+    expect((await svc.getState(db, c.challengeId)).hostUserId).toBe(c.userId);
+    for (const u of [c.userId, g.userId]) {
+      await svc.lockRewards(db, c.challengeId, u, "sixeleven-cococoast-500ml", "kydra-axis-linerless-shorts-navy-m");
+      await svc.authorize(db, c.challengeId, u, 10_000, "http://localhost");
+    }
+    await expect(svc.cancelChallenge(db, c.challengeId, c.userId)).rejects.toThrow(/started/);
+  });
+});

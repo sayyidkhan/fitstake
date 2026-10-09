@@ -25,7 +25,7 @@ export const challenges = sqliteTable("challenges", {
   // Public challenges appear in the lobby while they have an open seat.
   isPublic: integer("is_public", { mode: "boolean" }).notNull().default(true),
   // draft -> active (both rewards locked + authorised) -> settled
-  status: text("status", { enum: ["draft", "active", "settled"] }).notNull().default("draft"),
+  status: text("status", { enum: ["draft", "active", "settled", "cancelled"] }).notNull().default("draft"),
   startedAt: integer("started_at", { mode: "timestamp" }),
   settledAt: integer("settled_at", { mode: "timestamp" }),
   winnerUserId: text("winner_user_id"),

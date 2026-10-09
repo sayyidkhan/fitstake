@@ -8,7 +8,7 @@ import { getReap, type CheckoutResult, type ReapClient } from "./reap.js";
 import { decide, rank, scoreUser } from "./scoring.js";
 
 export class HttpError extends Error {
-  constructor(public status: 400 | 404 | 409, message: string) {
+  constructor(public status: 400 | 403 | 404 | 409, message: string) {
     super(message);
   }
 }
@@ -51,6 +51,7 @@ async function addParticipant(db: DB, challengeId: string, userId: string) {
 }
 
 async function joinExisting(db: DB, challenge: typeof t.challenges.$inferSelect, input: { name: string; email: string }) {
+  if (challenge.status === "cancelled") throw new HttpError(409, "That challenge was cancelled");
   if (challenge.status !== "draft") throw new HttpError(409, "That challenge has already started");
   const user = await upsertUser(db, input.name, input.email);
   const people = await db.select().from(t.participants).where(eq(t.participants.challengeId, challenge.id));
@@ -357,6 +358,30 @@ function toPublicUser(u: { id: string; name: string }) {
   return { id: u.id, name: u.name };
 }
 
+// The host is whoever created the challenge: its first participant.
+async function hostOf(db: DB, challengeId: string): Promise<string | undefined> {
+  const [first] = await db
+    .select({ userId: t.participants.userId })
+    .from(t.participants)
+    .where(eq(t.participants.challengeId, challengeId))
+    .orderBy(sql`created_at, rowid`)
+    .limit(1);
+  return first?.userId;
+}
+
+// Only the host can cancel, and only before the challenge starts. Nothing has been charged by then.
+export async function cancelChallenge(db: DB, challengeId: string, userId: string) {
+  const [challenge] = await db.select().from(t.challenges).where(eq(t.challenges.id, challengeId));
+  if (!challenge) throw new HttpError(404, "Challenge not found");
+  if ((await hostOf(db, challengeId)) !== userId) throw new HttpError(403, "Only the host can cancel this challenge");
+  if (challenge.status === "cancelled") return;
+  if (challenge.status !== "draft") throw new HttpError(409, "A challenge that has started can’t be cancelled");
+  await db
+    .update(t.challenges)
+    .set({ status: "cancelled" })
+    .where(and(eq(t.challenges.id, challengeId), eq(t.challenges.status, "draft")));
+}
+
 export async function getState(db: DB, challengeId: string) {
   const [challenge] = await db.select().from(t.challenges).where(eq(t.challenges.id, challengeId));
   if (!challenge) throw new HttpError(404, "Challenge not found");
@@ -374,6 +399,7 @@ export async function getState(db: DB, challengeId: string) {
   );
   return {
     challenge,
+    hostUserId: await hostOf(db, challengeId),
     participants: people.map((p) => ({
       // Only the name is public to other participants; emails stay private.
       user: toPublicUser(users.find((u) => u.id === p.userId)!),

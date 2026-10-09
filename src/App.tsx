@@ -298,6 +298,43 @@ export default function App() {
       </Shell>
     );
 
+  if (state.challenge.status === "cancelled")
+    return (
+      <Shell page={page}>
+        <div className="panel p-5 cancelled-panel" role="status">
+          <p className="eyebrow">CHALLENGE CANCELLED</p>
+          <h1 className="dashboard-title">{state.challenge.name}</h1>
+          <p className="text-sm text-slate-400">
+            This challenge was cancelled before it started, so nothing was
+            charged. You can start a new one or join another from the lobby.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button
+              className={btn}
+              onClick={() => {
+                localStorage.removeItem(KEY);
+                setSession(null);
+                setState(null);
+              }}
+            >
+              Start a new challenge
+            </button>
+            <button
+              className={btn}
+              onClick={() => {
+                localStorage.removeItem(KEY);
+                setSession(null);
+                setState(null);
+                window.location.hash = "#challenges";
+              }}
+            >
+              Browse open challenges
+            </button>
+          </div>
+        </div>
+      </Shell>
+    );
+
   const apply = (p: Promise<State>) =>
     run(() => p).then((s) => s && setState(s));
   const { challenge, participants, leaderboard, transactions } = state;
@@ -342,6 +379,25 @@ export default function App() {
           >
             Refresh challenge
           </button>
+          {challenge.status === "draft" &&
+            state.hostUserId === session.userId && (
+              <button
+                className="text-sm text-red-700 underline"
+                disabled={busy}
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      participants.length > 1
+                        ? "Cancel this challenge? Your friend will be told it was cancelled."
+                        : "Cancel this challenge? It will be removed from the lobby.",
+                    )
+                  )
+                    apply(api.cancel(challenge.id, session.userId));
+                }}
+              >
+                Cancel challenge
+              </button>
+            )}
           <button
             className="text-sm text-slate-400 underline"
             onClick={() => {
