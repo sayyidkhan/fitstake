@@ -17,17 +17,17 @@ const load = (): Session | null => {
   }
 };
 
-// The six-step product workflow, shown on the landing page and tracked on the dashboard.
+// The six-step product workflow, shown on the How it works page and tracked on the dashboard.
 // Day label for each workflow step. Pass the challenge length for exact days; omit it for generic labels.
 function stepDay(i: number, days?: number): string {
-  if (i === 0) return "DAY 1";
+  if (i === 0) return "Day 1";
   if (i === 3) {
-    if (days === undefined) return "THE DAYS IN BETWEEN";
-    if (days <= 1) return "DAY 1";
-    if (days === 2) return "DAYS 1–2";
-    return days === 3 ? "DAY 2" : `DAYS 2–${days - 1}`;
+    if (days === undefined) return "The days in between";
+    if (days <= 1) return "Day 1";
+    if (days === 2) return "Days 1–2";
+    return days === 3 ? "Day 2" : `Days 2–${days - 1}`;
   }
-  if (i === 4) return days === undefined ? "FINAL DAY" : `DAY ${days}`;
+  if (i === 4) return days === undefined ? "Final day" : `Day ${days}`;
   return "";
 }
 
@@ -40,18 +40,36 @@ const WORKFLOW = [
   { title: "Agentic payment", short: "Payment", icon: "card", copy: "AI quotes and initiates both reward purchases using Reap" },
 ] as const;
 
-function Icon({ name }: { name: "shield" | "card" }) {
+type IconName = "shield" | "card" | "check" | "clock" | "arrow" | "copy";
+
+// One drawn icon set (24px grid, 1.75 stroke) instead of emoji and unicode glyphs.
+function Icon({ name, className = "icon" }: { name: IconName; className?: string }) {
   return (
-    <svg className="wf-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      {name === "shield" ? (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {name === "shield" && (
         <>
           <path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z" />
           <path d="M9 12l2 2 4-4" />
         </>
-      ) : (
+      )}
+      {name === "card" && (
         <>
           <rect x="3" y="6" width="18" height="12" rx="3" />
           <path d="M3 10h18M16 14h2" />
+        </>
+      )}
+      {name === "check" && <path d="M5 12.5l4.5 4.5L19 7.5" />}
+      {name === "clock" && (
+        <>
+          <circle cx="12" cy="12" r="8.5" />
+          <path d="M12 7.5V12l3 2" />
+        </>
+      )}
+      {name === "arrow" && <path d="M5 12h14M13 6l6 6-6 6" />}
+      {name === "copy" && (
+        <>
+          <rect x="8.5" y="8.5" width="11" height="11" rx="2.5" />
+          <path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5" />
         </>
       )}
     </svg>
@@ -68,16 +86,11 @@ function Workflow({ days }: { days?: number }) {
             {stepDay(i, days) && (
               <span className="wf-day">{stepDay(i, days)}</span>
             )}
-            {"icon" in step && <Icon name={step.icon} />}
+            {"icon" in step && <Icon name={step.icon} className="wf-icon" />}
             <h3>
               {i + 1}. {step.title}
             </h3>
             <p>{step.copy}</p>
-            {i < WORKFLOW.length - 1 && (
-              <span className="wf-arrow" aria-hidden="true">
-                ↓
-              </span>
-            )}
           </li>
         ))}
       </ol>
@@ -122,7 +135,6 @@ function HowItWorks({ onStart }: { onStart: () => void }) {
   return (
     <>
       <section className="hiw-hero">
-        <p className="eyebrow">HOW IT WORKS</p>
         <h1>Day 1: Commit. Final day: Settle.</h1>
         <p className="hero-copy">
           Two friends compete for as many days as they choose (from a single day) on healthy, consistency-first goals.
@@ -131,7 +143,7 @@ function HowItWorks({ onStart }: { onStart: () => void }) {
           better prize.
         </p>
         <button className={btn} onClick={onStart}>
-          Start a challenge <span>→</span>
+          Start a challenge <Icon name="arrow" />
         </button>
       </section>
       <Workflow />
@@ -139,12 +151,15 @@ function HowItWorks({ onStart }: { onStart: () => void }) {
         <h2 id="hiw-steps-title">Step by step</h2>
         {WORKFLOW.map((step, i) => (
           <article key={step.title} className="hiw-step">
-            <div className="hiw-badge">{i + 1}</div>
+            <div className="hiw-badge" aria-hidden="true">{i + 1}</div>
             <div>
               {stepDay(i, undefined) && (
                 <span className="hiw-day">{stepDay(i, undefined)}</span>
               )}
-              <h3>{step.title}</h3>
+              <h3>
+                <span className="sr-only">Step {i + 1}: </span>
+                {step.title}
+              </h3>
               <dl>
                 <dt>What you do</dt>
                 <dd>{DETAILS[i]!.you}</dd>
@@ -184,15 +199,23 @@ function HowItWorks({ onStart }: { onStart: () => void }) {
   );
 }
 
-const card = "panel rounded-2xl p-5";
-const btn = "action px-4 py-2 font-semibold disabled:opacity-40";
-const input = "field w-full px-3 py-2";
+const card = "panel";
+const btn = "action";
+const btnQuiet = "action action-quiet";
+const input = "field";
+
+const STATUS_LABEL = {
+  draft: "Setting up",
+  active: "In progress",
+  settled: "Finished",
+} as const;
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(load);
   const [state, setState] = useState<State | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [page, setPage] = useState<"home" | "how">(
     window.location.hash === "#how-it-works" ? "how" : "home",
   );
@@ -221,6 +244,11 @@ export default function App() {
     localStorage.setItem(KEY, JSON.stringify(s));
     setSession(s);
   };
+  const leave = () => {
+    localStorage.removeItem(KEY);
+    setSession(null);
+    setState(null);
+  };
 
   useEffect(() => {
     if (!session) return;
@@ -246,16 +274,20 @@ export default function App() {
   if (!state)
     return (
       <Shell page={page}>
-        <div className="panel p-5">
-          <p role="status">{error || "Loading your challenge…"}</p>
-          <button
-            className={btn + " mt-4"}
-            onClick={() => {
-              localStorage.removeItem(KEY);
-              setSession(null);
-              setState(null);
-            }}
-          >
+        <div className="panel loading-panel" aria-busy={!error}>
+          {error ? (
+            <p role="alert" className="error-banner">
+              We couldn’t load your challenge. {error}
+            </p>
+          ) : (
+            <>
+              <p role="status" className="sr-only">Loading your challenge…</p>
+              <span className="skeleton" style={{ width: "40%" }} />
+              <span className="skeleton" style={{ width: "70%" }} />
+              <span className="skeleton" style={{ width: "55%" }} />
+            </>
+          )}
+          <button className={btnQuiet} onClick={leave}>
             Back to start
           </button>
         </div>
@@ -268,7 +300,10 @@ export default function App() {
   const me = participants.find((p) => p.user.id === session.userId);
   const nameOf = (id: string | null) =>
     participants.find((p) => p.user.id === id)?.user.name ?? "?";
+  const activity = getActivity(challenge.activity);
   const maxPoints = challenge.durationDays * 100; // 90 capped minutes + 10 bonus per day
+  const lockedCount = participants.filter((p) => p.rewards.length === 2).length;
+  const readyCount = participants.filter((p) => p.authorised).length;
   // Current workflow step (0-based): 0 create/invite, 1 rewards, 2 authorise, 3 compete, 5 payment.
   const stepIndex: number =
     challenge.status === "settled"
@@ -282,38 +317,52 @@ export default function App() {
           : participants.every((p) => p.rewards.length === 2)
             ? 2
             : 1;
+  const copyCode = () => {
+    navigator.clipboard
+      ?.writeText(challenge.inviteCode)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1800);
+      })
+      .catch(() => {});
+  };
 
   return (
     <Shell page={page}>
-      <header className="mb-6 flex flex-wrap items-center justify-between gap-2">
+      <header className="dash-header">
         <div>
-          <p className="eyebrow">YOUR CHALLENGE HQ</p>
           <h1 className="dashboard-title">{challenge.name}</h1>
-          <p className="activity-chip">
-            <span aria-hidden="true">{getActivity(challenge.activity).icon}</span>{" "}
-            {getActivity(challenge.activity).label}
-          </p>
-          <p className="text-sm text-slate-400">
-            Status: <b className="text-teal-400">{challenge.status}</b> · Invite
-            code: <b>{challenge.inviteCode}</b>
+          <p className="dash-meta">
+            <span className="activity-chip">{activity.label}</span>
+            <span className={`status status-${challenge.status}`}>
+              {STATUS_LABEL[challenge.status]}
+            </span>
+            <span className="invite">
+              Invite code <code>{challenge.inviteCode}</code>
+              <button
+                type="button"
+                className="icon-button"
+                onClick={copyCode}
+                aria-label="Copy invite code"
+              >
+                <Icon name={copied ? "check" : "copy"} />
+              </button>
+              <span role="status" className="sr-only">
+                {copied ? "Invite code copied" : ""}
+              </span>
+            </span>
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="dash-actions">
           <button
-            className={btn}
+            className={btnQuiet}
             disabled={busy}
+            aria-busy={busy}
             onClick={() => apply(api.state(challenge.id))}
           >
-            Refresh challenge
+            Refresh
           </button>
-          <button
-            className="text-sm text-slate-400 underline"
-            onClick={() => {
-              localStorage.removeItem(KEY);
-              setSession(null);
-              setState(null);
-            }}
-          >
+          <button className="text-button" onClick={leave}>
             Back to start
           </button>
         </div>
@@ -331,97 +380,94 @@ export default function App() {
             aria-current={i === stepIndex ? "step" : undefined}
             className={i === stepIndex ? "current" : i < stepIndex ? "done" : ""}
           >
-            <span>{i < stepIndex ? "✓" : `0${i + 1}`}</span>
+            <span className="journey-mark">
+              {i < stepIndex ? <Icon name="check" /> : i + 1}
+            </span>
             {step.short}
           </li>
         ))}
       </ol>
-      <div className="dashboard-stats">
+      <dl className="summary">
         <div>
-          <span>THE COMMITMENT</span>
-          <strong>
-            {challenge.durationDays} <small>{challenge.durationDays === 1 ? "day" : "days"}</small>
-          </strong>
+          <dt>Length</dt>
+          <dd>
+            {challenge.durationDays} {challenge.durationDays === 1 ? "day" : "days"}
+          </dd>
         </div>
         <div>
-          <span>THE ACTIVITY</span>
-          <strong className="next-step">
-            {getActivity(challenge.activity).icon}{" "}
-            {getActivity(challenge.activity).label.split(" (")[0]}
-          </strong>
+          <dt>Players</dt>
+          <dd>{participants.length} of 2</dd>
         </div>
         <div>
-          <span>YOUR TEAM</span>
-          <strong>
-            {participants.length}
-            <small> / 2 friends</small>
-          </strong>
+          <dt>Rewards locked</dt>
+          <dd>{lockedCount} of 2</dd>
         </div>
         <div>
-          <span>REWARD CATALOGUE</span>
-          <strong>
-            S$58<small> · best tier</small>
-          </strong>
+          <dt>Cards ready</dt>
+          <dd>{readyCount} of 2</dd>
         </div>
-        <div>
-          <span>THE NEXT STEP</span>
-          <strong className="next-step">
+        <div className="summary-next">
+          <dt>Next step</dt>
+          <dd>
             {stepIndex >= 6 ? "All done" : `${stepIndex + 1}. ${WORKFLOW[stepIndex]!.title}`}
-          </strong>
+          </dd>
         </div>
-      </div>
-      <section className="mb-6 grid gap-4 sm:grid-cols-2">
+      </dl>
+      <section className="players">
         {participants.map((p) => (
           <div key={p.user.id} className={card}>
             <div className="participant-heading">
-              <span className="avatar">
+              <span className="avatar" aria-hidden="true">
                 {p.user.name.slice(0, 1).toUpperCase()}
               </span>
               <div>
-                <p className="eyebrow">
-                  {p.user.id === session.userId
-                    ? "YOUR COMMITMENT"
-                    : "YOUR CHALLENGE PARTNER"}
-                </p>
-                <h2 className="font-semibold">
+                <h2>
                   {p.user.name}
-                  {p.user.id === session.userId && " (you)"}
+                  {p.user.id === session.userId && <span className="you"> (you)</span>}
                 </h2>
+                <p className="meta">
+                  {p.user.id === session.userId ? "Your commitment" : "Your challenge partner"}
+                </p>
               </div>
             </div>
-            <ul className="mt-2 text-sm text-slate-300">
+            <ul className="reward-list">
               {p.rewards.length ? (
                 p.rewards.map((r) => (
                   <li key={r.id} className="reward-row">
-                    <span className="reward-symbol">
-                      {r.tier === "best" ? "◇" : "◉"}
-                    </span>
                     <div>
-                      <span className="eyebrow">
-                        {r.tier === "best" ? "BEST REWARD" : "LITTLE TREAT"} ·{" "}
-                        {r.merchant}
+                      <span className="meta">
+                        {r.tier === "best" ? "Best reward" : "Little treat"} · {r.merchant}
                       </span>
                       <p>{r.productName}</p>
                     </div>
-                    <strong>{money(r.priceCents)}</strong>
+                    <strong className="num">{money(r.priceCents)}</strong>
                   </li>
                 ))
               ) : (
-                <li className="text-slate-500">Rewards not locked</li>
+                <li className="reward-empty">Rewards not locked yet</li>
               )}
             </ul>
-            <p className="mt-2 text-sm">
+            <p className={`card-state ${p.authorised ? "ok" : ""}`}>
+              <Icon name={p.authorised ? "check" : "clock"} />
               {p.authorised
-                ? "✅ Sandbox enrolment ready"
+                ? "Sandbox enrolment ready"
                 : p.enrolmentPending
-                  ? "⏳ Awaiting card enrolment"
-                  : "⏳ No card yet"}
+                  ? "Awaiting card enrolment"
+                  : "No card yet"}
             </p>
           </div>
         ))}
         {participants.length < 2 && (
-          <div className={card + " text-slate-400"}>
-            Waiting for your friend. Share code <b>{challenge.inviteCode}</b>.
+          <div className="panel waiting">
+            <h2>Waiting for your friend</h2>
+            <p>
+              Send them the invite code <code>{challenge.inviteCode}</code>. They
+              choose “Join a friend” on the home page and enter it.
+            </p>
+            <button type="button" className={btnQuiet} onClick={copyCode}>
+              <Icon name={copied ? "check" : "copy"} />
+              {copied ? "Copied" : "Copy invite code"}
+            </button>
           </div>
         )}
       </section>
@@ -437,30 +483,34 @@ export default function App() {
       )}
 
       {challenge.status !== "draft" && (
-        <section className={card + " mb-6"}>
-          <p className="eyebrow">{stepDay(3, challenge.durationDays)}</p>
-          <h2 className="mb-3 font-semibold">4. Compete and improve</h2>
+        <section className={card + " section"}>
+          <p className="meta">{stepDay(3, challenge.durationDays)}</p>
+          <h2 className="section-title">4. Compete and improve</h2>
           {leaderboard[0] && leaderboard[0].points > 0 ? (
-            <ol className="space-y-1">
+            <ol className="ranking">
               {leaderboard.map((s, i) => (
-                <li key={s.userId} className="ranking-row">
+                <li key={s.userId} className={`ranking-row ${i === 0 ? "leader" : ""}`}>
                   <div>
-                    <span className="rank">0{i + 1}</span>
+                    <span className="rank">{i + 1}</span>
                     <strong>{nameOf(s.userId)}</strong>
-                    <span className="points">
+                    <span className="points num">
                       {s.points.toLocaleString()} pts
                     </span>
                   </div>
-                  <div className="score-track">
+                  <div
+                    className="score-track"
+                    role="img"
+                    aria-label={`${Math.round((s.points / maxPoints) * 100)}% of maximum score`}
+                  >
                     <span
                       style={{
-                        width: `${Math.min(100, (s.points / maxPoints) * 100)}%`,
+                        transform: `scaleX(${Math.min(1, s.points / maxPoints)})`,
                       }}
                     />
                   </div>
-                  <p>
+                  <p className="num">
                     {s.adherentDays} active days ·{" "}
-                    {getActivity(challenge.activity).stepsPerMinute > 0 &&
+                    {activity.stepsPerMinute > 0 &&
                       `${s.totalSteps.toLocaleString()} steps · `}
                     {Math.round((s.points / maxPoints) * 100)}% of maximum score
                   </p>
@@ -468,27 +518,32 @@ export default function App() {
               ))}
             </ol>
           ) : (
-            <p className="text-slate-400">No activity yet.</p>
+            <p className="empty-note">
+              No activity logged yet. In this demo, use “Simulate activity” to
+              fill in {challenge.durationDays === 1 ? "the day" : `all ${challenge.durationDays} days`} for both players.
+            </p>
           )}
-          <p className="mt-3 text-xs text-slate-500">
-            Rules: up to 90 active min/day count, +10 for each day with 30+
-            minutes. Ties: more active days, then more steps, then a fixed hash.
+          <p className="fine-print">
+            Rules: up to 90 active minutes a day count, plus 10 for each day with
+            30+ minutes. Ties: more active days, then more steps, then a fixed hash.
           </p>
           {challenge.status === "active" && (
-            <div className="mt-4 flex flex-wrap gap-3">
+            <div className="button-row">
               <button
-                className={btn}
+                className={leaderboard[0]?.points ? btnQuiet : btn}
                 disabled={busy}
+                aria-busy={busy}
                 onClick={() => apply(api.simulate(challenge.id))}
               >
-                Simulate {challenge.durationDays} {challenge.durationDays === 1 ? "day" : "days"} of activity
+                Simulate activity
               </button>
               <button
-                className={btn}
+                className={leaderboard[0]?.points ? btn : btnQuiet}
                 disabled={busy || !leaderboard[0]?.points}
+                aria-busy={busy}
                 onClick={() => apply(api.settle(challenge.id))}
               >
-                Simulate Day {challenge.durationDays} — settle
+                Settle on Day {challenge.durationDays}
               </button>
             </div>
           )}
@@ -496,34 +551,37 @@ export default function App() {
       )}
 
       {challenge.status === "settled" && (
-        <section className={card}>
-          <p className="eyebrow">DAY {challenge.durationDays}</p>
-          <h2 className="font-semibold">
-            5. AI determines the results: {nameOf(challenge.winnerUserId)} wins
+        <section className={card + " section"}>
+          <p className="meta">Day {challenge.durationDays}</p>
+          <h2 className="section-title">
+            5. Results: {nameOf(challenge.winnerUserId)} wins
           </h2>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="fine-print">
             Fixed scoring rules pick the winner; AI only explains the result.
           </p>
-          <h2 className="mt-5 font-semibold">6. Agentic payment</h2>
-          <ul className="mt-3 space-y-2 text-sm">
+          <h2 className="section-title sub">6. Agentic payment</h2>
+          <ul className="tx-list">
             {transactions.map((t) => (
               <li key={t.id}>
-                {nameOf(t.payerUserId)} buys for {nameOf(t.recipientUserId)}:{" "}
-                {t.amountCents ? money(t.amountCents) : "—"} ·{" "}
-                <b
-                  className={
-                    t.status === "completed"
-                      ? "text-teal-400"
-                      : "text-amber-400"
-                  }
-                >
+                <div>
+                  <p>
+                    {nameOf(t.payerUserId)} buys for {nameOf(t.recipientUserId)}
+                  </p>
+                  {t.failureReason && (
+                    <p className="tx-reason">{t.failureReason}</p>
+                  )}
+                </div>
+                <strong className="num">
+                  {t.amountCents ? money(t.amountCents) : "—"}
+                </strong>
+                <span className={`tx-status tx-${t.status}`}>
                   {t.status.replace("_", " ")}
-                </b>
+                </span>
                 {t.status === "requires_approval" &&
                   t.checkoutUrl &&
                   t.payerUserId === session.userId && (
                     <a
-                      className="ml-2 text-teal-400 underline"
+                      className={btn}
                       href={t.checkoutUrl}
                       target="_blank"
                       rel="noopener noreferrer"
@@ -531,35 +589,36 @@ export default function App() {
                       Approve payment
                     </a>
                   )}
-                {t.failureReason && (
-                  <span className="text-red-300"> ({t.failureReason})</span>
-                )}
               </li>
             ))}
           </ul>
-          {transactions.some(
-            (t) =>
-              t.status === "requires_approval" ||
-              t.status === "checkout_opened",
-          ) && (
-            <button
-              className={btn + " mt-3 mr-3"}
-              disabled={busy}
-              onClick={() => apply(api.refreshTransactions(challenge.id))}
-            >
-              Refresh payment status
-            </button>
-          )}
-          {transactions.some((t) => t.status === "failed") && (
-            <button
-              className={btn + " mt-3"}
-              disabled={busy}
-              onClick={() => apply(api.settle(challenge.id))}
-            >
-              Retry failed checkouts
-            </button>
-          )}
-          <p className="mt-3 text-xs text-slate-500">
+          <div className="button-row">
+            {transactions.some(
+              (t) =>
+                t.status === "requires_approval" ||
+                t.status === "checkout_opened",
+            ) && (
+              <button
+                className={btnQuiet}
+                disabled={busy}
+                aria-busy={busy}
+                onClick={() => apply(api.refreshTransactions(challenge.id))}
+              >
+                Refresh payment status
+              </button>
+            )}
+            {transactions.some((t) => t.status === "failed") && (
+              <button
+                className={btn}
+                disabled={busy}
+                aria-busy={busy}
+                onClick={() => apply(api.settle(challenge.id))}
+              >
+                Retry failed checkouts
+              </button>
+            )}
+          </div>
+          <p className="fine-print">
             Sandbox only: no money moves and nothing ships.
           </p>
         </section>
@@ -569,24 +628,30 @@ export default function App() {
 }
 
 function Shell({ children, page }: { children: React.ReactNode; page: "home" | "how" }) {
-  const [mode, setMode] = useState("Checking…");
+  const [mode, setMode] = useState<{ label: string; tone: "ok" | "warn" | "off" }>({
+    label: "Checking…",
+    tone: "off",
+  });
   useEffect(() => {
     api
       .config()
       .then((c) =>
         setMode(
           c.payments === "reap_sandbox"
-            ? "Reap sandbox"
+            ? { label: "Reap sandbox", tone: "ok" }
             : c.payments === "simulated"
-              ? "Local simulator"
-              : "Payment setup required",
+              ? { label: "Local simulator", tone: "ok" }
+              : { label: "Payment setup required", tone: "warn" },
         ),
       )
-      .catch(() => setMode("Connection unavailable"));
+      .catch(() => setMode({ label: "Connection unavailable", tone: "warn" }));
   }, []);
   return (
     <div className="app-shell">
-      <nav className="topbar">
+      <a className="skip-link" href="#main">
+        Skip to content
+      </a>
+      <header className="topbar">
         <a className="brand" href="/" aria-label="FitStake home">
           FitStake<span className="brand-dot">.</span>
         </a>
@@ -601,13 +666,15 @@ function Shell({ children, page }: { children: React.ReactNode; page: "home" | "
             How it works
           </a>
         </nav>
-        <span className="sandbox-pill">
-          <i /> {mode}
+        <span className={`sandbox-pill tone-${mode.tone}`} title="Payment mode">
+          <i aria-hidden="true" /> {mode.label}
         </span>
-      </nav>
-      <main className="workspace">{children}</main>
+      </header>
+      <main id="main" className="workspace">
+        {children}
+      </main>
       <footer>
-        <span>FITSTAKE · MADE FOR YOUR NEXT PERSONAL BEST</span>
+        <span>FitStake · made for your next personal best</span>
         <span>
           Simulated fitness. Sandbox purchases. No real money or deliveries.
         </span>
@@ -647,131 +714,124 @@ function Start({
     ).then((r) => r && onStart(r));
   };
   return (
-    <>
-      <div className="landing-grid">
-        <section className="hero">
-          <p className="eyebrow">YOUR GOALS. YOUR FRIEND. YOUR REWARDS.</p>
-          <h1>
-            Good habits.
-            <br />
-            Friendly rivalry.
-            <br />
-            <em>Better rewards.</em>
-          </h1>
-          <p className="hero-copy">
-            Turn “we should work out” into a commitment. Challenge a
-            friend, build a healthier routine, and make every active day count.
-          </p>
-          <div className="hero-tags">
-            <span>↗ Days of momentum</span>
-            <span>◎ 1 friend by your side</span>
-            <a className="text-link" href="#how-it-works">
-              See how it works ↗
-            </a>
-          </div>
-          <div className="reward-preview">
-            <div className="reward-art" aria-hidden="true">
-              <svg viewBox="0 0 180 150">
-                <path
-                  d="M42 30h96l-5 26 17 69-54 6-7-50-6 50-53-6 17-69z"
-                  fill="#273c36"
-                />
-                <path d="M44 31h92v12H44z" fill="#142c24" />
-                <path
-                  d="M88 43v38M51 57l-9 60M126 57l13 60"
-                  stroke="#70847a"
-                  strokeWidth="2"
-                />
-                <path
-                  d="M85 40l-4 26m10-26 6 26"
-                  stroke="#e6e4c4"
-                  strokeWidth="2"
-                />
-              </svg>
-            </div>
-            <div>
-              <p className="eyebrow">A LITTLE EXTRA MOTIVATION</p>
-              <h3>Your next win looks good.</h3>
-              <p>KYDRA Axis Linerless Shorts</p>
-              <span className="reward-price">
-                S$58.00 <small>· Best reward</small>
-              </span>
-            </div>
-          </div>
-          <p className="catalog-note">
-            Illustrative reward · final availability and price checked at
-            checkout
-          </p>
-        </section>
-        <section className="onboarding panel">
-          <div className="card-heading">
-            <span className="eyebrow">LET’S MAKE IT HAPPEN</span>
-            <span className="step-dot">STEP 1 · DAY 1</span>
-          </div>
-          <h2>
-            Your next chapter
-            <br />
-            starts together.
-          </h2>
-          <p>Choose how many days, invite a friend, and agree on the scoring rules.</p>
-          <div className="tabs" role="tablist" aria-label="Challenge action">
-            <button
-              role="tab"
-              aria-selected={mode === "create"}
-              onClick={() => setMode("create")}
-            >
-              Start a challenge <span>↗</span>
-            </button>
-            <button
-              role="tab"
-              aria-selected={mode === "join"}
-              onClick={() => setMode("join")}
-            >
-              Join a friend <span>↗</span>
-            </button>
-          </div>
-          <form onSubmit={submit} className="start-form">
-            <label>
-              Your name
-              <input
-                className={input}
-                placeholder="What should we call you?"
-                autoComplete="name"
-                maxLength={60}
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+    <div className="landing-grid">
+      <section className="hero">
+        <h1>
+          Good habits.
+          <br />
+          Friendly rivalry.
+          <br />
+          <em>Better rewards.</em>
+        </h1>
+        <p className="hero-copy">
+          Turn “we should work out” into a commitment. Challenge a
+          friend, build a healthier routine, and make every active day count.
+        </p>
+        <p className="hero-tags">
+          <span>One friend, one activity, any length from 1 to 365 days.</span>
+          <a className="text-link" href="#how-it-works">
+            See how it works
+          </a>
+        </p>
+        <figure className="reward-preview">
+          <div className="reward-art" aria-hidden="true">
+            <svg viewBox="0 0 180 150">
+              <path
+                d="M42 30h96l-5 26 17 69-54 6-7-50-6 50-53-6 17-69z"
+                fill="#273c36"
               />
-            </label>
-            <label>
-              Email address
-              <input
-                className={input}
-                placeholder="you@example.com"
-                autoComplete="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+              <path d="M44 31h92v12H44z" fill="#142c24" />
+              <path
+                d="M88 43v38M51 57l-9 60M126 57l13 60"
+                stroke="#70847a"
+                strokeWidth="2"
               />
-            </label>
-            {mode === "create" ? (
-              <>
-                <label>
-                  Challenge name
-                  <input
-                    className={input}
-                    required
-                    maxLength={80}
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                  />
-                </label>
+              <path
+                d="M85 40l-4 26m10-26 6 26"
+                stroke="#e6e4c4"
+                strokeWidth="2"
+              />
+            </svg>
+          </div>
+          <figcaption>
+            <h3>Your next win looks good.</h3>
+            <p>KYDRA Axis Linerless Shorts</p>
+            <span className="reward-price num">
+              S$58.00 <small>· Best reward</small>
+            </span>
+          </figcaption>
+        </figure>
+        <p className="catalog-note">
+          Illustrative reward. Final availability and price are checked at
+          checkout.
+        </p>
+      </section>
+      <section className="onboarding panel" aria-labelledby="onboarding-title">
+        <p className="meta">Step 1 · Day 1</p>
+        <h2 id="onboarding-title">Your next chapter starts together.</h2>
+        <p className="onboarding-lede">
+          Choose how many days, invite a friend, and agree on the scoring rules.
+        </p>
+        <div className="segmented" role="group" aria-label="Challenge action">
+          <button
+            type="button"
+            aria-pressed={mode === "create"}
+            onClick={() => setMode("create")}
+          >
+            Start a challenge
+          </button>
+          <button
+            type="button"
+            aria-pressed={mode === "join"}
+            onClick={() => setMode("join")}
+          >
+            Join a friend
+          </button>
+        </div>
+        <form onSubmit={submit} className="start-form">
+          <label>
+            Your name
+            <input
+              className={input}
+              placeholder="What should we call you?"
+              autoComplete="name"
+              maxLength={60}
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </label>
+          <label>
+            Email address
+            <input
+              className={input}
+              placeholder="you@example.com"
+              autoComplete="email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </label>
+          {mode === "create" ? (
+            <>
+              <label>
+                Challenge name
+                <input
+                  className={input}
+                  required
+                  maxLength={80}
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                />
+              </label>
+              <div className="field-pair">
                 <label>
                   Activity
                   <select
                     className={input}
                     value={activity}
+                    aria-describedby="activity-hint"
                     onChange={(e) => setActivity(e.target.value)}
                   >
                     {ACTIVITY_CATEGORIES.map((cat) => (
@@ -779,20 +839,16 @@ function Start({
                         {ACTIVITIES.filter((a) => a.category === cat).map(
                           (a) => (
                             <option key={a.id} value={a.id}>
-                              {a.icon} {a.label}
+                              {a.label}
                             </option>
                           ),
                         )}
                       </optgroup>
                     ))}
                   </select>
-                  <small className="field-hint">
-                    Both players do this activity. Scoring counts active
-                    minutes, so any activity is fair.
-                  </small>
                 </label>
                 <label>
-                  Challenge length (days)
+                  Length (days)
                   <input
                     className={input}
                     type="number"
@@ -801,99 +857,110 @@ function Start({
                     max={365}
                     step={1}
                     required
+                    aria-describedby="days-hint"
+                    aria-invalid={!daysOk}
                     value={Number.isNaN(days) ? "" : days}
                     onChange={(e) => setDays(e.target.valueAsNumber)}
                   />
-                  <small className="field-hint">
-                    From 1 to 365 days. Settlement happens on the final day.
-                  </small>
                 </label>
-              </>
-            ) : (
-              <label>
-                Invite code
-                <input
-                  className={input}
-                  placeholder="Enter your friend’s code"
-                  required
-                  value={code}
-                  onChange={(e) => setCode(e.target.value.toUpperCase())}
-                />
-              </label>
-            )}
-            <label className="agree">
+              </div>
+              <p className="field-hint" id="activity-hint">
+                Both players do this activity. Scoring counts active minutes, so
+                any activity is fair.{" "}
+                <span id="days-hint">
+                  Pick 1 to 365 days; settlement happens on the final day.
+                </span>
+              </p>
+            </>
+          ) : (
+            <label>
+              Invite code
               <input
-                type="checkbox"
+                className={input + " code-input"}
+                placeholder="Enter your friend’s code"
+                autoComplete="off"
+                autoCapitalize="characters"
+                spellCheck={false}
                 required
-                checked={agreed}
-                onChange={(e) => setAgreed(e.target.checked)}
+                value={code}
+                onChange={(e) => setCode(e.target.value.toUpperCase())}
               />
-              <span>
-                I agree to the scoring rules: active minutes (capped at
-                90 a day) plus a bonus for each active day. Ties use active
-                days, then steps.
-              </span>
             </label>
-            {error && (
-              <p role="alert" className="error-banner">
-                {error}
-              </p>
-            )}
-            {!busy && (
-              <p className="field-hint" role="status">
-                {!name.trim() || !email.trim()
-                  ? "Add your name and email to continue."
-                  : !ok
-                    ? "Enter a valid email address."
-                    : mode === "create" && !daysOk
-                      ? "Choose a length from 1 to 365 days."
-                      : mode === "join" && code.trim().length < 4
-                        ? "Enter your friend’s invite code."
-                        : !agreed
-                          ? "Tick the box to agree to the scoring rules."
-                          : ""}
-              </p>
-            )}
-            <button
-              className={btn + " submit-action"}
-              disabled={
-                busy ||
-                !ok ||
-                !agreed ||
-                (mode === "create"
-                  ? !title.trim() || !daysOk
-                  : code.trim().length < 4)
-              }
-            >
-              {busy
-                ? "Getting things ready…"
-                : mode === "create"
-                  ? "Create my challenge"
-                  : "Join the challenge"}
-              <span>→</span>
-            </button>
-          </form>
-          <p className="form-note">
-            Two friends. One commitment. Everyone gets a reward.
-          </p>
+          )}
+          <label className="agree">
+            <input
+              type="checkbox"
+              required
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+            />
+            <span>
+              I agree to the scoring rules: active minutes (capped at
+              90 a day) plus a bonus for each active day. Ties use active
+              days, then steps.
+            </span>
+          </label>
+          {error && (
+            <p role="alert" className="error-banner">
+              {error}
+            </p>
+          )}
           <button
+            className={btn + " submit-action"}
+            aria-busy={busy}
+            disabled={
+              busy ||
+              !ok ||
+              !agreed ||
+              (mode === "create"
+                ? !title.trim() || !daysOk
+                : code.trim().length < 4)
+            }
+          >
+            {busy
+              ? "Getting things ready…"
+              : mode === "create"
+                ? "Create my challenge"
+                : "Join the challenge"}
+            <Icon name="arrow" />
+          </button>
+          {!busy && (
+            <p className="field-hint form-status" role="status">
+              {!name.trim() || !email.trim()
+                ? "Add your name and email to continue."
+                : !ok
+                  ? "Enter a valid email address."
+                  : mode === "create" && !daysOk
+                    ? "Choose a length from 1 to 365 days."
+                    : mode === "join" && code.trim().length < 4
+                      ? "Enter your friend’s invite code."
+                      : !agreed
+                        ? "Tick the box to agree to the scoring rules."
+                        : "Ready when you are."}
+            </p>
+          )}
+        </form>
+        <div className="onboarding-foot">
+          <p>Two friends. One commitment. Everyone gets a reward.</p>
+          <button
+            type="button"
             className="text-link"
             onClick={() => setRules(!rules)}
             aria-expanded={rules}
+            aria-controls="rules-note"
           >
-            {rules ? "Hide scoring rules" : "How does scoring work?"}{" "}
-            <span>↗</span>
+            {rules ? "Hide scoring rules" : "How does scoring work?"}
           </button>
           {rules && (
-            <div className="rules-note">
+            <div className="rules-note" id="rules-note">
               Earn one point per active minute, capped at 90 per day, plus 10
               points on days with at least 30 active minutes. Ties use active
               days, steps, then a fixed hash. No weight-loss targets.
             </div>
           )}
-        </section>
-      </div>
-    </>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -922,65 +989,70 @@ function Setup({
       .catch(() => {});
   }, []);
   const locked = me.rewards.length === 2;
+  const ceilingOk = Number.isFinite(ceiling) && ceiling >= 1 && ceiling <= 1000;
 
   return (
-    <section className={card + " mb-6 space-y-5"}>
-      <div>
-        <p className="eyebrow">DAY 1 · YOUR MOTIVATION, LOCKED IN</p>
-        <h2 className="setup-title">2. AI recommends rewards</h2>
+    <section className={card + " section setup"}>
+      <div className="setup-step">
+        <p className="meta">Day 1 · your motivation, locked in</p>
+        <h2 className="section-title">2. AI recommends rewards</h2>
         {locked ? (
-          <p className="text-sm text-slate-400">Locked in.</p>
+          <p className="card-state ok">
+            <Icon name="check" /> Rewards locked in
+          </p>
         ) : (
           <>
-            <div className="mt-2 flex gap-2">
+            <form
+              className="inline-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                apply(
+                  api.recommend(challengeId, prefs).then((r) => {
+                    setRec(r);
+                    return api.state(challengeId);
+                  }),
+                );
+              }}
+            >
+              <label className="sr-only" htmlFor="prefs">
+                Reward preferences
+              </label>
               <input
+                id="prefs"
                 className={input}
-                aria-label="Reward preferences"
                 placeholder="Optional: gym wear, snacks, things you like"
                 value={prefs}
                 onChange={(e) => setPrefs(e.target.value)}
               />
-              <button
-                className={btn}
-                disabled={busy}
-                onClick={() =>
-                  apply(
-                    api.recommend(challengeId, prefs).then((r) => {
-                      setRec(r);
-                      return api.state(challengeId);
-                    }),
-                  )
-                }
-              >
-                Suggest
+              <button className={rec ? btnQuiet : btn} disabled={busy} aria-busy={busy}>
+                {rec ? "Suggest again" : "Suggest rewards"}
               </button>
-            </div>
+            </form>
             {rec && (
-              <div className="mt-3 text-sm">
+              <>
                 <div className="recommendation-grid">
                   {[rec.lowest, rec.best].map((product) => (
                     <article key={product.id}>
-                      <span className="eyebrow">
-                        {product.tier === "best"
-                          ? "THE BIGGER WIN"
-                          : "THE LITTLE TREAT"}
+                      <span className="meta">
+                        {product.tier === "best" ? "The bigger win" : "The little treat"}
                       </span>
-                      <h3>{product.merchant}</h3>
-                      <p>{product.name}</p>
-                      <strong>{money(product.priceCents)}</strong>
+                      <h3>{product.name}</h3>
+                      <p>{product.merchant}</p>
+                      <strong className="num">{money(product.priceCents)}</strong>
                     </article>
                   ))}
                 </div>
+                <p className="rec-reason">{rec.reasoning}</p>
                 <p className="catalog-note">
                   {rec.source === "openai"
                     ? "AI-assisted suggestions"
                     : "Supported catalogue picks"}{" "}
                   · final quotes may include shipping and tax
                 </p>
-                <p className="mt-1 text-slate-400">{rec.reasoning}</p>
                 <button
-                  className={btn + " mt-3"}
+                  className={btn}
                   disabled={busy}
+                  aria-busy={busy}
                   onClick={() =>
                     apply(
                       api.lock(challengeId, userId, rec.lowest.id, rec.best.id),
@@ -989,43 +1061,49 @@ function Setup({
                 >
                   Lock in rewards
                 </button>
-              </div>
+              </>
             )}
           </>
         )}
       </div>
-      <div>
-        <h2 className="setup-title">3. Pre-authorise payment</h2>
+      <div className="setup-step">
+        <h2 className="section-title">3. Pre-authorise payment</h2>
         {me.authorised ? (
-          <p className="text-sm text-slate-400">Sandbox enrolment ready.</p>
+          <p className="card-state ok">
+            <Icon name="check" /> Sandbox enrolment ready
+          </p>
         ) : (
-          <div className="mt-2 space-y-2 text-sm">
-            <p className="text-slate-400">
+          <>
+            <p className="setup-copy">
               {simulated
                 ? "Local demo: simulate enrolment without entering a card. Your ceiling caps the final quote, including shipping and tax. No payment provider is contacted."
                 : "Enrol on Reap’s hosted sandbox page. Your ceiling caps the final quote, including shipping and tax. Each final-day charge needs your approval; no funds are held."}
             </p>
-            <label className="flex items-center gap-2">
-              S${" "}
-              <input
-                className={input + " max-w-28"}
-                aria-label="Spending ceiling in Singapore dollars"
-                type="number"
-                min={1}
-                max={1000}
-                value={ceiling}
-                onChange={(e) => setCeiling(Number(e.target.value))}
-              />
+            <label className="ceiling">
+              Spending ceiling
+              <span className="prefix-field">
+                <span aria-hidden="true">S$</span>
+                <input
+                  className={input}
+                  type="number"
+                  inputMode="decimal"
+                  min={1}
+                  max={1000}
+                  aria-invalid={!ceilingOk}
+                  aria-describedby="ceiling-hint"
+                  value={ceiling}
+                  onChange={(e) => setCeiling(Number(e.target.value))}
+                />
+              </span>
+              <small className="field-hint" id="ceiling-hint">
+                Between S$1 and S$1,000.
+              </small>
             </label>
-            <div className="flex flex-wrap gap-3">
+            <div className="button-row">
               <button
                 className={btn}
-                disabled={
-                  busy ||
-                  !Number.isFinite(ceiling) ||
-                  ceiling < 1 ||
-                  ceiling > 1000
-                }
+                disabled={busy || !ceilingOk}
+                aria-busy={busy}
                 onClick={async () => {
                   apply(
                     api
@@ -1046,22 +1124,24 @@ function Setup({
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  Open Reap enrolment ↗
+                  Open Reap enrolment
+                  <span className="sr-only"> (opens in a new tab)</span>
                 </a>
               )}
               {me.enrolmentPending && (
                 <button
-                  className={btn}
+                  className={btnQuiet}
                   disabled={busy}
+                  aria-busy={busy}
                   onClick={() =>
                     apply(api.enrollmentStatus(challengeId, userId))
                   }
                 >
-                  I've finished — check status
+                  I’ve finished: check status
                 </button>
               )}
             </div>
-          </div>
+          </>
         )}
       </div>
     </section>
