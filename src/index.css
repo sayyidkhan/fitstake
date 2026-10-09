@@ -26,7 +26,11 @@
   --radius: 14px;
   --radius-sm: 10px;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --gutter: clamp(16px, 5vw, 72px);
+  --gutter: clamp(16px, 4vw, 48px);
+  --content: 1200px;
+  --pad-panel: clamp(16px, 2.2vw, 28px);
+  --space-section: clamp(40px, 6vw, 72px);
+  --space-page: clamp(24px, 4vw, 48px);
 
   font-family: "Inter Variable", Inter, system-ui, sans-serif;
   font-feature-settings: "cv11", "ss01";
@@ -118,18 +122,19 @@ button:disabled {
 
 /* Shell */
 .app-shell {
-  min-height: 100dvh;
+  /* Divide by the zoom factor so large-screen scaling doesn't stretch the page height. */
+  min-height: calc(100dvh / var(--zoom, 1));
   display: flex;
   flex-direction: column;
 }
 .topbar {
-  min-height: 76px;
+  min-height: 68px;
   border-bottom: 1px solid var(--line);
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: 16px;
-  padding: 0 var(--gutter);
+  padding: 0 max(var(--gutter), calc((100% - var(--content)) / 2));
 }
 .brand {
   font-size: 28px;
@@ -202,8 +207,8 @@ button:disabled {
 }
 .workspace {
   width: 100%;
-  max-width: 1200px;
-  padding: 64px var(--gutter) 88px;
+  max-width: calc(var(--content) + 2 * var(--gutter));
+  padding: var(--space-page) var(--gutter) calc(var(--space-page) * 1.5);
   margin: 0 auto;
   flex: 1;
   box-sizing: border-box;
@@ -213,7 +218,7 @@ footer {
   justify-content: space-between;
   gap: 8px 24px;
   flex-wrap: wrap;
-  padding: 24px var(--gutter);
+  padding: 20px max(var(--gutter), calc((100% - var(--content)) / 2));
   border-top: 1px solid var(--line);
   font-size: 13px;
   color: var(--ink-3);
@@ -251,10 +256,10 @@ footer {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 24px;
+  padding: var(--pad-panel);
 }
 .section {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 /* Buttons */
@@ -393,7 +398,7 @@ footer {
   align-items: start;
 }
 .hero {
-  padding-top: 48px;
+  padding-top: clamp(0px, 3vw, 32px);
 }
 .hero h1 {
   font-size: clamp(44px, 4.6vw, 66px);
@@ -418,7 +423,7 @@ footer {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 20px;
-  margin: 24px 0 40px;
+  margin: 20px 0 clamp(24px, 3vw, 36px);
   font-size: 14px;
   color: var(--ink-2);
 }
@@ -456,7 +461,8 @@ footer {
   color: var(--ink-3);
 }
 .onboarding {
-  padding: 32px;
+  padding: var(--pad-panel);
+  container-type: inline-size;
 }
 .onboarding h2 {
   font-size: 30px;
@@ -478,7 +484,7 @@ footer {
   border-radius: 12px;
   background: var(--surface-3);
   gap: 4px;
-  margin: 24px 0;
+  margin: 20px 0;
 }
 .segmented button {
   min-height: 42px;
@@ -511,8 +517,14 @@ footer {
 }
 .field-pair {
   display: grid;
-  grid-template-columns: 1fr 120px;
+  grid-template-columns: minmax(0, 1fr) 104px;
   gap: 12px;
+}
+/* Stack activity and length when the form column is narrow, so the select never truncates. */
+@container (max-width: 460px) {
+  .field-pair {
+    grid-template-columns: 1fr;
+  }
 }
 .start-form > .field-hint {
   margin-top: -8px;
@@ -575,7 +587,7 @@ footer {
   align-items: flex-end;
   justify-content: space-between;
   gap: 16px 24px;
-  margin-bottom: 32px;
+  margin-bottom: clamp(20px, 3vw, 28px);
 }
 .dashboard-title {
   font-size: clamp(30px, 4vw, 42px);
@@ -690,7 +702,8 @@ footer {
   border-radius: var(--radius);
 }
 .summary > div {
-  padding: 18px 20px;
+  padding: clamp(12px, 1.6vw, 18px) clamp(14px, 1.8vw, 20px);
+  min-width: 0;
 }
 .summary > div + div {
   border-left: 1px solid #dbe4cc;
@@ -709,8 +722,8 @@ footer {
 .players {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
+  gap: clamp(12px, 1.6vw, 16px);
+  margin-bottom: 20px;
 }
 .participant-heading {
   display: flex;
@@ -915,10 +928,10 @@ footer {
 }
 .setup {
   display: grid;
-  gap: 32px;
+  gap: clamp(20px, 3vw, 28px);
 }
 .setup-step + .setup-step {
-  padding-top: 28px;
+  padding-top: clamp(20px, 3vw, 28px);
   border-top: 1px solid var(--line);
 }
 .setup-copy {
@@ -1017,7 +1030,7 @@ footer {
 /* How it works */
 .hiw-hero {
   max-width: 720px;
-  padding: 24px 0 8px;
+  padding: 0;
 }
 .hiw-hero h1 {
   font-size: clamp(38px, 5vw, 58px);
@@ -1031,7 +1044,7 @@ footer {
 }
 .workflow-section,
 .hiw-steps {
-  margin-top: 80px;
+  margin-top: var(--space-section);
 }
 .workflow-section h2,
 .hiw-steps h2,
@@ -1045,7 +1058,7 @@ footer {
   background: #121614;
   color: #f4f5f2;
   border-radius: 20px;
-  padding: 48px 24px;
+  padding: clamp(28px, 4vw, 44px) clamp(16px, 3vw, 24px);
   display: grid;
   text-align: center;
   list-style: none;
@@ -1091,8 +1104,8 @@ footer {
 .hiw-step {
   display: grid;
   grid-template-columns: 44px 1fr;
-  gap: 24px;
-  padding: 32px 0;
+  gap: clamp(12px, 2.4vw, 24px);
+  padding: clamp(20px, 3vw, 28px) 0;
   border-top: 1px solid var(--line);
 }
 .hiw-step:last-child {
@@ -1140,7 +1153,7 @@ footer {
   max-width: 68ch;
 }
 .hiw-faq {
-  margin-top: 80px;
+  margin-top: var(--space-section);
   max-width: 760px;
 }
 .hiw-faq details {
@@ -1234,18 +1247,11 @@ footer {
     font-size: 12px;
     padding: 6px 12px;
   }
-  .workspace {
-    padding-top: 36px;
-    padding-bottom: 64px;
-  }
   .hero h1 {
     font-size: 44px;
   }
   .hero-copy {
     font-size: 17px;
-  }
-  .onboarding {
-    padding: 22px 18px;
   }
   .onboarding h2 {
     font-size: 26px;
@@ -1274,9 +1280,6 @@ footer {
   .players {
     grid-template-columns: 1fr;
   }
-  .panel {
-    padding: 20px 18px;
-  }
   .inline-form {
     flex-direction: column;
   }
@@ -1287,9 +1290,6 @@ footer {
     padding-left: 0;
     border-left: 0;
     border-top: 1px solid var(--line);
-  }
-  .workflow {
-    padding: 32px 16px;
   }
   .workflow h3 {
     font-size: 18px;
@@ -1307,6 +1307,39 @@ footer {
   }
   footer {
     flex-direction: column;
+  }
+}
+
+@media (max-width: 400px) {
+  .journey {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .hero h1 {
+    font-size: 38px;
+  }
+  .dash-meta {
+    gap: 8px 10px;
+  }
+}
+
+/* High-resolution desktops: scale the whole interface instead of leaving a small island
+   in the middle of the screen. zoom keeps every px value proportional. */
+@media (min-width: 1800px) {
+  :root {
+    --zoom: 1.15;
+    zoom: var(--zoom);
+  }
+}
+@media (min-width: 2300px) {
+  :root {
+    --zoom: 1.35;
+    zoom: var(--zoom);
+  }
+}
+@media (min-width: 3200px) {
+  :root {
+    --zoom: 1.7;
+    zoom: var(--zoom);
   }
 }
 
